@@ -1,8 +1,12 @@
 template: standard_vpc
 
+az_count: 3
+
 parameters:
   VpcCidr: "10.0.0.0/16"
   PublicSubnetAZ0Cidr: "10.0.0.0/24"
   PublicSubnetAZ1Cidr: "10.0.1.0/24"
+  PublicSubnetAZ2Cidr: "10.0.2.0/24"
   PrivateSubnetAZ0Cidr: "10.0.3.0/24"
   PrivateSubnetAZ1Cidr: "10.0.4.0/24"
+  PrivateSubnetAZ2Cidr: "10.0.5.0/24"

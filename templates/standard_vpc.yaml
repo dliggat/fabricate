@@ -2,6 +2,8 @@ AWSTemplateFormatVersion: "2010-09-09"
 
 Description: {{ metadata['description'] }}
 
+{% set AzCount = project_file.get('az_count', 2) %}
+
 Metadata:
   CommitHash: {{ metadata['commit_hash'] }}
   CommitMessage: {{ metadata['commit_message'] }}
@@ -15,22 +17,16 @@ Parameters:
     Type: String
     Description: A network CIDR e.g. "10.0.0.0/16"
 
-  PublicSubnetAZ0Cidr:
+  {% for i in range(AzCount) %}
+  PublicSubnetAZ{{ i }}Cidr:
     Type: String
-    Description: A subnet CIDR e.g. "10.0.0.0/24"
+    Description: A subnet CIDR e.g. "10.0.{{ i }}.0/24"
 
-  PrivateSubnetAZ0Cidr:
+  PrivateSubnetAZ{{ i }}Cidr:
     Type: String
-    Description: A subnet CIDR e.g. "10.0.3.0/24"
+    Description: A subnet CIDR e.g. "10.0.{{ i + 10 }}.0/24"
 
-  PublicSubnetAZ1Cidr:
-    Type: String
-    Description: A subnet CIDR e.g. "10.0.1.0/24"
-
-  PrivateSubnetAZ1Cidr:
-    Type: String
-    Description: A subnet CIDR e.g. "10.0.4.0/24"
-
+  {% endfor %}
 
 Resources:
   Vpc:
@@ -104,13 +100,14 @@ Resources:
       RouteTableId:  { Ref: PublicRouteTable }
       GatewayId:     { Ref: InternetGateway }
 
-  PublicSubnetAZ0:
+  {% for i in range(AzCount) %}
+  PublicSubnetAZ{{ i }}:
     Type: AWS::EC2::Subnet
     Properties:
       VpcId: { Ref: Vpc }
-      AvailabilityZone: { "Fn::Select": [ "0", { "Fn::GetAZs": "" } ] }
+      AvailabilityZone: { "Fn::Select": [ "{{ i }}", { "Fn::GetAZs": "" } ] }
       MapPublicIpOnLaunch: "true"
-      CidrBlock: { Ref: PublicSubnetAZ0Cidr }
+      CidrBlock: { Ref: PublicSubnetAZ{{ i }}Cidr }
       Tags:
         - Key: Name
           Value:
@@ -118,19 +115,19 @@ Resources:
               - "-"
               - - { Ref: ResourcePrefix }
                 - "public"
-                - { "Fn::Select": [ "0", { "Fn::GetAZs": "" } ] }
-  SubnetRouteTableAssociationPublicAZ0:
+                - { "Fn::Select": [ "{{ i }}", { "Fn::GetAZs": "" } ] }
+  SubnetRouteTableAssociationPublicAZ{{ i }}:
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
-      SubnetId: { Ref: PublicSubnetAZ0 }
+      SubnetId: { Ref: PublicSubnetAZ{{ i }} }
       RouteTableId: { Ref: PublicRouteTable }
 
-  PrivateSubnetAZ0:
+  PrivateSubnetAZ{{ i }}:
     Type: AWS::EC2::Subnet
     Properties:
       VpcId: { Ref: Vpc }
-      AvailabilityZone: { "Fn::Select": [ "0", { "Fn::GetAZs": "" } ] }
-      CidrBlock: { Ref: PrivateSubnetAZ0Cidr }
+      AvailabilityZone: { "Fn::Select": [ "{{ i }}", { "Fn::GetAZs": "" } ] }
+      CidrBlock: { Ref: PrivateSubnetAZ{{ i }}Cidr }
       Tags:
         - Key: Name
           Value:
@@ -138,53 +135,14 @@ Resources:
               - "-"
               - - { Ref: ResourcePrefix }
                 - "private"
-                - { "Fn::Select": [ "0", { "Fn::GetAZs": "" } ] }
-  SubnetRouteTableAssociationPrivateAZ0:
+                - { "Fn::Select": [ "{{ i }}", { "Fn::GetAZs": "" } ] }
+  SubnetRouteTableAssociationPrivateAZ{{ i }}:
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
-      SubnetId: { Ref: PrivateSubnetAZ0 }
+      SubnetId: { Ref: PrivateSubnetAZ{{ i }} }
       RouteTableId: { Ref: PrivateRouteTable }
 
-  PublicSubnetAZ1:
-    Type: AWS::EC2::Subnet
-    Properties:
-      VpcId: { Ref: Vpc }
-      AvailabilityZone: { "Fn::Select": [ "1", { "Fn::GetAZs": "" } ] }
-      MapPublicIpOnLaunch: "true"
-      CidrBlock: { Ref: PublicSubnetAZ1Cidr }
-      Tags:
-        - Key: Name
-          Value:
-            "Fn::Join":
-              - "-"
-              - - { Ref: ResourcePrefix }
-                - "public"
-                - { "Fn::Select": [ "1", { "Fn::GetAZs": "" } ] }
-  SubnetRouteTableAssociationPublicAZ1:
-    Type: AWS::EC2::SubnetRouteTableAssociation
-    Properties:
-      SubnetId: { Ref: PublicSubnetAZ1 }
-      RouteTableId: { Ref: PublicRouteTable }
-
-  PrivateSubnetAZ1:
-    Type: AWS::EC2::Subnet
-    Properties:
-      VpcId: { Ref: Vpc }
-      AvailabilityZone: { "Fn::Select": [ "1", { "Fn::GetAZs": "" } ] }
-      CidrBlock: { Ref: PrivateSubnetAZ1Cidr }
-      Tags:
-        - Key: Name
-          Value:
-            "Fn::Join":
-              - "-"
-              - - { Ref: ResourcePrefix }
-                - "private"
-                - { "Fn::Select": [ "1", { "Fn::GetAZs": "" } ] }
-  SubnetRouteTableAssociationPrivateAZ1:
-    Type: AWS::EC2::SubnetRouteTableAssociation
-    Properties:
-      SubnetId: { Ref: PrivateSubnetAZ1 }
-      RouteTableId: { Ref: PrivateRouteTable }
+  {% endfor %}
 
 Outputs:
   VpcIdExport:
@@ -196,39 +154,24 @@ Outputs:
           - - { Ref: ResourcePrefix }
             - "VpcId"
 
-  PrivateSubnetAZ0Export:
-    Value: { Ref: PrivateSubnetAZ0 }
+  {% for i in range(AzCount) %}
+  PublicSubnetAZ{{ i }}Export:
+    Value: { Ref: PrivateSubnetAZ{{ i }} }
     Export:
       Name:
         "Fn::Join":
           - "-"
           - - { Ref: ResourcePrefix }
-            - PrivateSubnetAZ0
+            - PrivateSubnetAZ{{ i }}
 
-  PrivateSubnetAZ1Export:
-    Value: { Ref: PrivateSubnetAZ1 }
+  PrivateSubnetAZ{{ i }}Export:
+    Value: { Ref: PrivateSubnetAZ{{ i }} }
     Export:
       Name:
         "Fn::Join":
           - "-"
           - - { Ref: ResourcePrefix }
-            - PrivateSubnetAZ1
+            - PrivateSubnetAZ{{ i }}
 
-  PublicSubnetAZ0Export:
-    Value: { Ref: PublicSubnetAZ0 }
-    Export:
-      Name:
-        "Fn::Join":
-          - "-"
-          - - { Ref: ResourcePrefix }
-            - PublicSubnetAZ0
-
-  PublicSubnetAZ1Export:
-    Value: { Ref: PublicSubnetAZ1 }
-    Export:
-      Name:
-        "Fn::Join":
-          - "-"
-          - - { Ref: ResourcePrefix }
-            - PublicSubnetAZ1
+  {% endfor %}
 
