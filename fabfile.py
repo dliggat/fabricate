@@ -56,6 +56,7 @@ class Project(object):
     def __init__(self, project=env.project):
         self._data = { }
         self.project = project
+        _ensure_dir(self.project_output_dir)
         self.configuration
 
     @property
@@ -94,7 +95,6 @@ class Project(object):
     @property
     def project_output_dir(self):
         directory = os.path.join(OUTPUT_DIR, self.project)
-        _ensure_dir(directory)
         return directory
 
     @property
@@ -154,6 +154,16 @@ def validate():
                 project.rendered_template_filename, e))
             abort('Template validation error')
 
+
+@task
+def clean():
+    """Removes rendered output for this project."""
+    project = Project()
+    for f in glob.glob(os.path.join(project.project_output_dir, '*')):
+        os.remove(f)
+        logger.info('Deleted {0}'.format(f))
+    os.rmdir(project.project_output_dir)
+    logger.info('Deleted {0}'.format(project.project_output_dir))
 
 
 
