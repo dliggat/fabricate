@@ -8,8 +8,8 @@ import pprint
 import subprocess
 import yaml
 
+from botocore.exceptions import ClientError, ValidationError
 from collections import OrderedDict
-
 from fabric.api import task
 from fabric.operations import local
 from fabric.contrib.console import confirm
@@ -21,7 +21,6 @@ import logging; logging.basicConfig()
 import coloredlogs
 logger = logging.getLogger(__name__)
 coloredlogs.install(level=logging.INFO)
-
 
 
 def _construct_ordered_mapping(loader, node, deep=False):
@@ -59,7 +58,6 @@ class Project(object):
         self.project = project
         self.configuration
 
-
     @property
     def configuration(self):
         if 'project' not in env:
@@ -73,12 +71,12 @@ class Project(object):
         self._data['metadata'] = {
             'description': "A '{0}' stack for '{1}'.".format(self.template_name, self.project),
             'commit_hash': subprocess.check_output(['git', 'rev-parse', 'HEAD'])[:-1],
-            'commit_message': subprocess.check_output([
+            'commit_message': '"' + subprocess.check_output([
                 'git', 'log', '-1', '--pretty=%B']).strip()
                                                    .replace('"', '')
                                                    .replace('#', '')
                                                    .replace('\n', '')
-                                                   .replace(':', ' ') }
+                                                   .replace(':', ' ') + '"' }
         return self._data
 
     @property
@@ -143,6 +141,18 @@ def render():
             logger.info('Wrote properties file: {0}'.format(project.rendered_properties_filename))
 
 
+@task
+def validate():
+    """Validates the rendered template against the CloudFormation API."""
+    client = boto3.client('cloudformation')
+    project = Project()
+    with open(project.rendered_template_filename, 'r') as output_contents:
+        try:
+            client.validate_template(TemplateBody=output_contents.read())
+        except (ClientError, ValidationError) as e:
+            logger.error('Unable to validate {0}. Exception: {1}'.format(
+                project.rendered_template_filename, e))
+            abort('Template validation error')
 
 
 
