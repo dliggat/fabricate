@@ -1,0 +1,8 @@
+template: standard_vpc
+
+parameters:
+  VpcCidr: "10.0.0.0/16"
+  PublicSubnetAZ0Cidr: "10.0.0.0/24"
+  PublicSubnetAZ1Cidr: "10.0.1.0/24"
+  PrivateSubnetAZ0Cidr: "10.0.3.0/24"
+  PrivateSubnetAZ1Cidr: "10.0.4.0/24"
