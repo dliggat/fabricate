@@ -162,7 +162,7 @@ Outputs:
         "Fn::Join":
           - "-"
           - - { Ref: ResourcePrefix }
-            - PrivateSubnetAZ{{ i }}
+            - PublicSubnetAZ{{ i }}
 
   PrivateSubnetAZ{{ i }}Export:
     Value: { Ref: PrivateSubnetAZ{{ i }} }

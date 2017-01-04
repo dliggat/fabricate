@@ -3,6 +3,7 @@ template: standard_vpc
 az_count: 3
 
 parameters:
+  ResourcePrefix: test-vpc
   VpcCidr: "10.0.0.0/16"
   PublicSubnetAZ0Cidr: "10.0.0.0/24"
   PublicSubnetAZ1Cidr: "10.0.1.0/24"

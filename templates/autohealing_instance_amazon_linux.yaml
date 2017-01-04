@@ -1,6 +1,10 @@
 AWSTemplateFormatVersion: "2010-09-09"
 
-Description: "An autohealing instance"
+Description: {{ metadata['description'] }}
+
+Metadata:
+  CommitHash: {{ metadata['commit_hash'] }}
+  CommitMessage: {{ metadata['commit_message'] }}
 
 Parameters:
   ResourcePrefix:
