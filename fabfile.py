@@ -44,6 +44,14 @@ def _construct_yaml_ordered_map(loader, node, deep=False):
 yaml.add_constructor(yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG, _construct_yaml_ordered_map)
 
 
+def _json_serial(obj):
+    """JSON serializer for objects not serializable by default json code"""
+    if isinstance(obj, datetime.datetime):
+        serial = obj.isoformat()
+        return serial
+    raise TypeError ("Type not serializable")
+
+
 def _ensure_dir(directory):
     """Creates directory if it does not already exist."""
     if not os.path.exists(directory):
@@ -53,9 +61,9 @@ def _ensure_dir(directory):
 
 class Project(object):
 
-    def __init__(self, project=env.project):
+    def __init__(self, project=None):
         self._data = { }
-        self.project = project
+        self.name = project or env.project
         _ensure_dir(self.project_output_dir)
         self.configuration
 
@@ -63,14 +71,16 @@ class Project(object):
     def configuration(self):
         if 'project' not in env:
             raise CfabException('No project set. Use fab --set project=$NAME')
-        project_file = os.path.join(PROJECT_DIR, self.project + '.yaml')
+        project_file = os.path.join(PROJECT_DIR, self.name + '.yaml')
         if not os.path.exists(project_file):
             raise CfabException('Unable to find project file {0}'.format(project_file))
 
         with open(project_file, 'r') as project_file_contents:
             self._data['project_file'] = yaml.load(project_file_contents.read())
+        description = "A '{0}' stack for {1}; rendered on {2} by {3}.".format(self.template_name,
+            self.name, datetime.date.today().isoformat(), os.path.basename(ROOT_DIR))
         self._data['metadata'] = {
-            'description': "A '{0}' stack for '{1}'.".format(self.template_name, self.project),
+            'description': description,
             'commit_hash': subprocess.check_output(['git', 'rev-parse', 'HEAD'])[:-1],
             'commit_message': '"' + subprocess.check_output([
                 'git', 'log', '-1', '--pretty=%B']).strip()
@@ -89,18 +99,18 @@ class Project(object):
         return os.path.join(self.project_output_dir, RENDERED_TEMPLATE_FILE)
 
     @property
-    def rendered_properties_filename(self):
-        return os.path.join(self.project_output_dir, RENDERED_PROPERTIES_FILE)
+    def rendered_parameters_filename(self):
+        return os.path.join(self.project_output_dir, RENDERED_PARAMETERS_FILE)
 
     @property
     def project_output_dir(self):
-        directory = os.path.join(OUTPUT_DIR, self.project)
+        directory = os.path.join(OUTPUT_DIR, self.name)
         return directory
 
     @property
     def parameters(self):
         if not 'parameters' in self._data['project_file']:
-            return None
+            return []
         return [{'ParameterKey': k,
                  'ParameterValue': v,
                  'UsePreviousValue': False}
@@ -114,7 +124,7 @@ PROJECT_DIR  = os.path.join(ROOT_DIR, 'projects')
 TEMPLATE_DIR = os.path.join(ROOT_DIR, 'templates')
 OUTPUT_DIR   = os.path.join(ROOT_DIR, '_output')
 RENDERED_TEMPLATE_FILE = 'template.yaml'
-RENDERED_PROPERTIES_FILE = 'properties.json'
+RENDERED_PARAMETERS_FILE = 'parameters.json'
 
 
 
@@ -133,12 +143,12 @@ def render():
         logger.info('Wrote {0} to {1}'.format(
             project.template_name, project.rendered_template_filename))
 
-    # Write the properties file to _output.
+    # Write the parameters file to _output.
     if project.parameters:
         output_json = json.dumps(project.parameters, indent=2, separators=(',', ': '))
-        with open(project.rendered_properties_filename, 'w') as output_contents:
+        with open(project.rendered_parameters_filename, 'w') as output_contents:
             output_contents.write(output_json)
-            logger.info('Wrote properties file: {0}'.format(project.rendered_properties_filename))
+            logger.info('Wrote parameters file: {0}'.format(project.rendered_parameters_filename))
 
 
 @task
@@ -164,6 +174,53 @@ def clean():
         logger.info('Deleted {0}'.format(f))
     os.rmdir(project.project_output_dir)
     logger.info('Deleted {0}'.format(project.project_output_dir))
+
+
+@task
+def describe():
+    client = boto3.client('cloudformation')
+    project = Project()
+    stack_name = project.name
+    resp = client.describe_stacks(StackName=stack_name)
+    # logger.info(pprint.pformat(resp))
+    logger.info(json.dumps(resp, indent=2, default=_json_serial))
+
+
+
+@task
+def provision():
+    """Creates or updates a CloudFormation stack.
+    """
+    client = boto3.client('cloudformation')
+    project = Project()
+    stack_name = project.name
+
+    update = False
+    try:
+        resp = client.describe_stacks(StackName=stack_name)
+        message = 'Stack {0} exists, and is in state {1}. Proceed with update?'.format(
+            stack_name, resp['Stacks'][0]['StackStatus'])
+        if not confirm(message):
+            abort('Aborting.')
+        else:
+            update = True
+    except ClientError:
+        logger.info('No stack named {0}; proceeding with stack creation'.format(stack_name))
+
+    with open(project.rendered_template_filename) as template_contents, open(
+        project.rendered_parameters_filename) as parameters_contents:
+        parameters = json.load(parameters_contents)
+        if update:
+            response = client.update_stack(StackName=stack_name,
+                                           TemplateBody=template_contents.read(),
+                                           Parameters=parameters,
+                                           Capabilities=['CAPABILITY_IAM'])
+        else:
+            response = client.create_stack(StackName=stack_name,
+                                           TemplateBody=template_contents.read(),
+                                           Parameters=parameters,
+                                           Capabilities=['CAPABILITY_IAM'])
+        logger.info(json.dumps(response, indent=2))
 
 
 

@@ -1,0 +1,10 @@
+template: autohealing_instance_amazon_linux
+
+parameters:
+  ResourcePrefix: temp-amazon-linux
+  VpcExportIdentifier: dliggat-tam-vpc-VpcId
+  SubnetAZ0ExportIdentifier: dliggat-tam-vpc-PublicSubnetAZ0
+  SubnetAZ1ExportIdentifier: dliggat-tam-vpc-PublicSubnetAZ1
+  KeypairName: dliggat-tam
+  AmiId: ami-1e299d7e
+  InstanceType: t2.medium
