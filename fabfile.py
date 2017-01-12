@@ -130,6 +130,7 @@ RENDERED_PARAMETERS_FILE = 'parameters.json'
 
 @task(default=True)
 def render():
+    """Renders template and parameters files for the given project into _output."""
     project = Project()
     _ensure_dir(OUTPUT_DIR)
     jenv = jinja2.Environment(trim_blocks=True, lstrip_blocks=True, undefined=jinja2.StrictUndefined)
@@ -178,11 +179,11 @@ def clean():
 
 @task
 def describe():
+    """Describes a CloudFormation stack"""
     client = boto3.client('cloudformation')
     project = Project()
     stack_name = project.name
     resp = client.describe_stacks(StackName=stack_name)
-    # logger.info(pprint.pformat(resp))
     logger.info(json.dumps(resp, indent=2, default=_json_serial))
 
 
