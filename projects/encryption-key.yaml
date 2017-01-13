@@ -1,0 +1,4 @@
+template: kms
+
+parameters:
+  KeyAliasName: alias/davekey

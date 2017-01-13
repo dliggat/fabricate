@@ -1,0 +1,85 @@
+AWSTemplateFormatVersion: "2010-09-09"
+
+Description: {{ metadata['description'] }}
+
+{% set role_permit_count = project_file.get('role_permit_count', 4) %}
+
+Metadata:
+  CommitHash: {{ metadata['commit_hash'] }}
+  CommitMessage: {{ metadata['commit_message'] }}
+
+Parameters:
+  KeyAliasName:
+    Type: String
+    Description: "A string that starts with 'alias/', e.g. 'alias/davekey'"
+
+  {% for i in range(role_permit_count) %}
+  PermitDecryptionByRoleArn{{ i }}:
+    Type: String
+    Default: ""
+    Description: An optional ARN of a role that may decrypt using this key
+  {% endfor %}
+
+
+Conditions:
+  {% for i in range(role_permit_count) %}
+  NoPermitDecryptionByRoleArn{{ i }}:
+    "Fn::Equals":
+      - { Ref: PermitDecryptionByRoleArn{{ i }} }
+      - ""
+  {% endfor %}
+
+
+Resources:
+  KeyAlias:
+    Type: AWS::KMS::Alias
+    Properties:
+      AliasName: { Ref: KeyAliasName }
+      TargetKeyId: { Ref: ConfigurationKey }
+
+  ConfigurationKey:
+    Type: AWS::KMS::Key
+    Properties:
+      Description: A key for encrypting configuration items for fab_aws
+      KeyPolicy:
+        Version: "2012-10-17"
+        Id: configuration-key-policy
+        Statement:
+          - Sid: Allow administration, encrypting, decrypting by all entities in this AWS account.
+            Effect: Allow
+            Principal:
+              AWS: { "Fn::Join": [ ":", [ "arn", "aws", "iam:", { "Ref" : "AWS::AccountId" }, "root" ] ] }
+            Action:
+              - "kms:Create*"
+              - "kms:Describe*"
+              - "kms:Encrypt*"
+              - "kms:Decrypt*"
+              - "kms:Enable*"
+              - "kms:List*"
+              - "kms:Put*"
+              - "kms:Update*"
+              - "kms:Revoke*"
+              - "kms:Disable*"
+              - "kms:Get*"
+              - "kms:Delete*"
+              - "kms:ScheduleKeyDeletion"
+              - "kms:CancelKeyDeletion"
+            Resource: "*"
+          {% for i in range(role_permit_count) %}
+          - "Fn::If":
+            - NoPermitDecryptionByRoleArn{{ i }}
+            - { Ref: "AWS::NoValue" }
+            - Sid: Allow decryption by this IAM role ARN
+              Effect: Allow
+              Principal:
+                AWS: { Ref: PermitDecryptionByRoleArn{{ i }} }
+              Action:
+                - "kms:Decrypt*"
+              Resource: "*"
+          {% endfor %}
+
+
+
+Outputs:
+  ConfigurationKeyId:
+    Value: { Ref : ConfigurationKey }

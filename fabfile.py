@@ -145,11 +145,10 @@ def render():
             project.template_name, project.rendered_template_filename))
 
     # Write the parameters file to _output.
-    if project.parameters:
-        output_json = json.dumps(project.parameters, indent=2, separators=(',', ': '))
-        with open(project.rendered_parameters_filename, 'w') as output_contents:
-            output_contents.write(output_json)
-            logger.info('Wrote parameters file: {0}'.format(project.rendered_parameters_filename))
+    output_json = json.dumps(project.parameters, indent=2, separators=(',', ': '))
+    with open(project.rendered_parameters_filename, 'w') as output_contents:
+        output_contents.write(output_json)
+        logger.info('Wrote parameters file: {0}'.format(project.rendered_parameters_filename))
 
 
 @task
