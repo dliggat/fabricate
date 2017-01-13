@@ -126,3 +126,13 @@ Resources:
       VPCZoneIdentifier:
         - "Fn::ImportValue": { Ref: SubnetAZ0ExportIdentifier }
         - "Fn::ImportValue": { Ref: SubnetAZ1ExportIdentifier }
+
+Outputs:
+  SgIdExport:
+    Value: { Ref: SecurityGroup }
+    Export:
+      Name:
+        "Fn::Join":
+          - "-"
+          - - { Ref: ResourcePrefix }
+            - "SgId"

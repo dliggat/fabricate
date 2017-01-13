@@ -1,7 +1,7 @@
 template: autohealing_instance_amazon_linux
 
 parameters:
-  ResourcePrefix: temp-amazon-linux
+  ResourcePrefix: tam-demo-amazon-linux
   VpcExportIdentifier: dliggat-tam-vpc-VpcId
   SubnetAZ0ExportIdentifier: dliggat-tam-vpc-PublicSubnetAZ0
   SubnetAZ1ExportIdentifier: dliggat-tam-vpc-PublicSubnetAZ1

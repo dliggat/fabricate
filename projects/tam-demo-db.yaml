@@ -1,0 +1,11 @@
+template: rds
+
+parameters:
+  ResourcePrefix: tam-demo-db
+  VpcExportIdentifier: dliggat-tam-vpc-VpcId
+  SubnetAZ0ExportIdentifier: dliggat-tam-vpc-PrivateSubnetAZ0
+  SubnetAZ1ExportIdentifier: dliggat-tam-vpc-PrivateSubnetAZ1
+  DBIngressSecurityGroupExportIdentifier: tam-demo-amazon-linux-SgId
+  DbName: davetestdatabase
+  MultiAz: "false"
+
