@@ -77,7 +77,7 @@ class Project(object):
 
         with open(project_file, 'r') as project_file_contents:
             self._data['project_file'] = yaml.load(project_file_contents.read())
-        description = "A '{0}' stack for {1}; rendered on {2} by {3}.".format(self.template_name,
+        description = "A '{0}' stack for project '{1}'; rendered on {2} by {3}.".format(self.template_name,
             self.name, datetime.date.today().isoformat(), os.path.basename(ROOT_DIR))
         self._data['metadata'] = {
             'description': description,

@@ -156,7 +156,7 @@ Outputs:
 
   {% for i in range(AzCount) %}
   PublicSubnetAZ{{ i }}Export:
-    Value: { Ref: PrivateSubnetAZ{{ i }} }
+    Value: { Ref: PublicSubnetAZ{{ i }} }
     Export:
       Name:
         "Fn::Join":

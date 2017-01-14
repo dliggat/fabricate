@@ -21,30 +21,35 @@ Parameters:
 
   MultiAz:
     Type: String
-    Default: "true"
 
   PubliclyAccessible:
     Type: String
-    Default: "false"
 
   DbName:
     Type: String
 
   DbEngine:
     Type: String
-    Default: postgres
 
   DbVersion:
     Type: String
-    Default: "9.4.5"
 
   DbPort:
     Type: String
-    Default: "5432"
 
   DbInstanceClass:
     Type: String
-    Default: db.t2.medium
+
+  AllocatedStorage:
+    Type: String
+
+  RdsUsername:
+    Type: String
+    NoEcho: "true"
+
+  RdsPassword:
+    Type: String
+    NoEcho: "true"
 
   DBIngressSecurityGroupExportIdentifier:
     Type: String
@@ -60,9 +65,9 @@ Conditions:
 Resources:
   Database:
     Type: AWS::RDS::DBInstance
-    DeletionPolicy: Retain
+    DeletionPolicy: Snapshot
     Properties:
-      AllocatedStorage: "10"
+      AllocatedStorage: { Ref: AllocatedStorage }
       AllowMajorVersionUpgrade: "false"
       AutoMinorVersionUpgrade: "true"
       AvailabilityZone: { "Fn::Select": [ "0", { "Fn::GetAZs": "" } ] }
@@ -71,8 +76,8 @@ Resources:
       DBSubnetGroupName: { "Ref" : "DatabaseSubnetGroup" }
       Engine: { Ref: DbEngine }
       EngineVersion: { Ref: DbVersion }
-      MasterUsername: "foobarbaz"
-      MasterUserPassword: "foobarbaz"
+      MasterUsername: { Ref: RdsUsername }
+      MasterUserPassword: { Ref: RdsPassword }
       MultiAZ: { Ref: MultiAz }
       Port: { Ref: DbPort }
       PubliclyAccessible: { Ref: PubliclyAccessible }
@@ -120,6 +125,12 @@ Resources:
             "Fn::Join":
               - "-"
               - - { Ref: ResourcePrefix }
-                - "subnets"
+                - "subnet-group"
 
-
+Outputs:
+  DbEndpointHost:
+    Value:
+      "Fn::GetAtt": [ Database, Endpoint.Address ]
+  DbEndpointPort:
+    Value:
+      "Fn::GetAtt": [ Database, Endpoint.Port ]

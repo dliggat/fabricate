@@ -2,10 +2,18 @@ template: rds
 
 parameters:
   ResourcePrefix: tam-demo-db
-  VpcExportIdentifier: dliggat-tam-vpc-VpcId
-  SubnetAZ0ExportIdentifier: dliggat-tam-vpc-PrivateSubnetAZ0
-  SubnetAZ1ExportIdentifier: dliggat-tam-vpc-PrivateSubnetAZ1
+  VpcExportIdentifier: dliggat-vpc-VpcId
+  SubnetAZ0ExportIdentifier: dliggat-vpc-PrivateSubnetAZ0
+  SubnetAZ1ExportIdentifier: dliggat-vpc-PrivateSubnetAZ1
   DBIngressSecurityGroupExportIdentifier: tam-demo-amazon-linux-SgId
-  DbName: davetestdatabase
+  DbName: tamdemodb
   MultiAz: "false"
+  PubliclyAccessible: "false"
+  DbEngine: postgres
+  DbVersion: "9.4.5"
+  DbPort: "5432"
+  DbInstanceClass: db.t2.medium
+  AllocatedStorage: "10"
+  RdsUsername: foobarbaz
+  RdsPassword: foobarbaz
 
