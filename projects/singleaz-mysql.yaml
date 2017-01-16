@@ -1,0 +1,20 @@
+template: rds
+
+parameters:
+  ResourcePrefix: tam-demo-db
+  VpcExportIdentifier: dliggat-vpc-VpcId
+  SubnetAZ0ExportIdentifier: dliggat-vpc-PrivateSubnetAZ0
+  SubnetAZ1ExportIdentifier: dliggat-vpc-PrivateSubnetAZ1
+  DBIngressSecurityGroupExportIdentifier: tam-demo-amazon-linux-SgId
+  DbName: tamdemodb
+  MultiAz: "false"
+  PubliclyAccessible: "false"
+  DbEngine: mysql
+  DbVersion: "5.6"
+  DbPort: "3306"
+  DbInstanceClass: db.t2.medium
+  AllocatedStorage: "10"
+  RdsUsername: foobarbaz
+  RdsPassword: foobarbaz
+
+# mysql -h sdrymzt3qegi3r.cp4cdogz9hsy.us-west-2.rds.amazonaws.com -u foobarbaz -p
