@@ -61,6 +61,11 @@ Conditions:
       - { Ref: DBIngressSecurityGroupExportIdentifier }
       - ""
 
+  IsMultiAz:
+    "Fn::Equals":
+      - { Ref: MultiAz }
+      - "true"
+
 
 Resources:
   Database:
@@ -70,7 +75,11 @@ Resources:
       AllocatedStorage: { Ref: AllocatedStorage }
       AllowMajorVersionUpgrade: "false"
       AutoMinorVersionUpgrade: "true"
-      AvailabilityZone: { "Fn::Select": [ "0", { "Fn::GetAZs": "" } ] }
+      AvailabilityZone:
+        "Fn::If":
+          - IsMultiAz
+          - { Ref: "AWS::NoValue" }
+          - { "Fn::Select": [ "0", { "Fn::GetAZs": "" } ] }
       DBInstanceClass: { Ref: DbInstanceClass }
       DBName: { Ref: DbName }
       DBSubnetGroupName: { "Ref" : "DatabaseSubnetGroup" }
@@ -90,7 +99,7 @@ Resources:
             "Fn::Join":
               - "-"
               - - { Ref: ResourcePrefix }
-                - "database"
+                - "db"
 
 
   DatabaseSecurityGroup:
