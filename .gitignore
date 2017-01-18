@@ -1,4 +1,5 @@
 _output/*
+*.local.yaml
 
 
 # Byte-compiled / optimized / DLL files

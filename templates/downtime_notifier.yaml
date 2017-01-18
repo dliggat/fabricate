@@ -1,0 +1,192 @@
+AWSTemplateFormatVersion: "2010-09-09"
+
+Description: {{ metadata['description'] }}
+
+{% set subscriptions = project_file.get('subscriptions', []) %}
+
+Metadata:
+  CommitHash: {{ metadata['commit_hash'] }}
+  CommitMessage: {{ metadata['commit_message'] }}
+
+
+Parameters:
+  ScheduleExpression:
+    Type: String
+    Description: How often to invoke the function (e.g. 'rate(24 hours)'), or empty string to skip creating a AWS::Events::Rule
+
+  Timeout:
+    Type: Number
+    Description: Timeout for the function in seconds
+
+  MemorySize:
+    Type: Number
+    Description: Memory for the function in MB
+
+  SnsDisplayName:
+    Type: String
+
+Resources:
+
+  # The function itself.
+  LambdaFunction:
+    Type: AWS::Lambda::Function
+    DependsOn: [ LambdaFunctionExecutionRole ]
+    Properties:
+      Code:
+        ZipFile:
+          "Fn::Join":
+            - "\n"
+            - - "def handler(event, context):"
+              - "    print('This is a no-op; will be overwritten later.')"
+      Role: { "Fn::GetAtt": [ LambdaFunctionExecutionRole, Arn ] }
+      Timeout: { Ref: Timeout }
+      Handler: index.handler
+      Runtime: python2.7
+      MemorySize: { Ref: Timeout }
+
+
+  # The IAM role that the lambda function will execute under.
+  LambdaFunctionExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: [ lambda.amazonaws.com ]
+            Action:
+              - sts:AssumeRole
+      Path: /
+      Policies:
+        - PolicyName: WriteLogsToCloudWatch
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - "logs:CreateLogGroup"
+                  - "logs:CreateLogStream"
+                  - "logs:PutLogEvents"
+                Resource: "arn:aws:logs:*:*:*"
+        - PolicyName: PublishToSNSTopic
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: [ "sns:Publish" ]
+                Resource: { Ref : NotificationTopic }
+        - PolicyName: ReadWriteDynamoResultTable
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:DescribeTable
+                  - dynamodb:GetItem
+                  - dynamodb:PutItem
+                  - dynamodb:Query
+                Resource:
+                  "Fn::Join":
+                    - ":"
+                    - - "arn"
+                      - "aws"
+                      - "dynamodb"
+                      - { "Ref": "AWS::Region" }
+                      - { "Ref" : "AWS::AccountId" }
+                      - "Fn::Join":
+                        - "/"
+                        - - "table"
+                          - { "Ref" : "ResultTable" }
+
+      # Unused.
+      # ManagedPolicyArns:
+      #   - arn:aws:iam::aws:policy/AmazonEC2ReadOnlyAccess
+
+
+
+  # Permits the events service to invoke the service.
+  LambdaPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      SourceArn:
+        "Fn::GetAtt": [ ScheduledRule, Arn ]
+      FunctionName: { "Fn::GetAtt": [ LambdaFunction, Arn ] }
+      Principal: events.amazonaws.com
+
+
+  # The cron rule for the execution.
+  ScheduledRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Description: ScheduledRule for the LambdaFunction
+      ScheduleExpression: { Ref : ScheduleExpression }
+      State: ENABLED
+      Targets:
+        - Arn: { "Fn::GetAtt": [ LambdaFunction, Arn ] }
+          Id: ScheduledRule
+
+
+  # The SNS topic to publish events to.
+  NotificationTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      DisplayName: { Ref: SnsDisplayName }
+      {% for sub in subscriptions %}
+      {% if loop.first %}
+      Subscription:
+      {% endif %}
+        - Endpoint: {{ sub['endpoint'] }}
+          Protocol: {{ sub['protocol'] }}
+      {% endfor %}
+
+
+  # DynamoDB table for caching results.
+  ResultTable:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    Properties:
+      AttributeDefinitions:
+        - AttributeName: TargetId
+          AttributeType: S
+        - AttributeName: Timestamp
+          AttributeType: S
+      KeySchema:
+        - AttributeName: TargetId
+          KeyType: HASH
+        - AttributeName: Timestamp
+          KeyType: RANGE
+      ProvisionedThroughput:
+        ReadCapacityUnits: 10
+        WriteCapacityUnits: 10
+      # GlobalSecondaryIndexes:
+      #   - IndexName: myGSI
+      #     KeySchema:
+      #       - AttributeName: IsNormal
+      #         KeyType: HASH
+      #       - AttributeName: SiteName
+      #         KeyType: RANGE
+      #     Projection:
+      #       NonKeyAttributes:
+      #         - CheckTimestamp
+      #       ProjectionType: INCLUDE
+      #     ProvisionedThroughput:
+      #       ReadCapacityUnits: 5
+      #       WriteCapacityUnits: 5
+
+
+
+Outputs:
+  LambdaFunction:
+    Value: { Ref : LambdaFunction }
+  LambdaFunctionARN:
+    Value: { "Fn::GetAtt": [ LambdaFunction, Arn ] }
+  LambdaFunctionExecutionRole:
+    Value: { Ref : LambdaFunctionExecutionRole }
+  LambdaFunctionExecutionRoleARN:
+    Value: { "Fn::GetAtt": [ LambdaFunctionExecutionRole, Arn ] }
+  ResultTable:
+    Value: { Ref : ResultTable }
+  SnsTopic:
+    Value: { Ref : NotificationTopic }

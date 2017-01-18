@@ -1,0 +1,7 @@
+template: lambda_function
+
+parameters:
+  ResourcePrefix: tam-function
+  ScheduleExpression: "rate(24 hours)"
+  Timeout: "300"
+  MemorySize: "256"

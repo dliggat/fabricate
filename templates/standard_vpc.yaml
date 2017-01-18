@@ -2,7 +2,7 @@ AWSTemplateFormatVersion: "2010-09-09"
 
 Description: {{ metadata['description'] }}
 
-{% set AzCount = project_file.get('az_count', 2) %}
+{% set az_count = project_file.get('az_count', 2) %}
 
 Metadata:
   CommitHash: {{ metadata['commit_hash'] }}
@@ -17,7 +17,7 @@ Parameters:
     Type: String
     Description: A network CIDR e.g. "10.0.0.0/16"
 
-  {% for i in range(AzCount) %}
+  {% for i in range(az_count) %}
   PublicSubnetAZ{{ i }}Cidr:
     Type: String
     Description: A subnet CIDR e.g. "10.0.{{ i }}.0/24"
@@ -100,7 +100,7 @@ Resources:
       RouteTableId:  { Ref: PublicRouteTable }
       GatewayId:     { Ref: InternetGateway }
 
-  {% for i in range(AzCount) %}
+  {% for i in range(az_count) %}
   PublicSubnetAZ{{ i }}:
     Type: AWS::EC2::Subnet
     Properties:
@@ -154,7 +154,7 @@ Outputs:
           - - { Ref: ResourcePrefix }
             - "VpcId"
 
-  {% for i in range(AzCount) %}
+  {% for i in range(az_count) %}
   PublicSubnetAZ{{ i }}Export:
     Value: { Ref: PublicSubnetAZ{{ i }} }
     Export:

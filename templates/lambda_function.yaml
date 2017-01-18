@@ -1,0 +1,123 @@
+AWSTemplateFormatVersion: "2010-09-09"
+
+Description: {{ metadata['description'] }}
+
+Metadata:
+  CommitHash: {{ metadata['commit_hash'] }}
+  CommitMessage: {{ metadata['commit_message'] }}
+
+Parameters:
+  ResourcePrefix:
+    Type: String
+    Description: A description to identify resources  (e.g. "my-perf-test")
+    MinLength: 2
+
+  ScheduleExpression:
+    Type: String
+    Default: ""
+    Description: How often to invoke the function (e.g. 'rate(24 hours)'), or empty string to skip creating a AWS::Events::Rule
+
+  Timeout:
+    Type: Number
+    Description: Timeout for the function in seconds
+
+  MemorySize:
+    Type: Number
+    Description: Memory for the function in MB
+
+
+Conditions:
+  HasSchedule:
+    "Fn::Not":
+      - "Fn::Equals":
+          - { Ref: ScheduleExpression }
+          - ""
+
+
+Resources:
+  LambdaFunction:
+    Type: AWS::Lambda::Function
+    Metadata:
+      Comment:
+        "Fn::Sub":
+          "Function for ${ResourcePrefix}"
+    DependsOn: [ LambdaFunctionExecutionRole ]
+    Properties:
+      Code:
+        ZipFile:
+          "Fn::Join":
+            - "\n"
+            - - "def handler(event, context):"
+              - "    print('This is a no-op; will be overwritten later.')"
+      Role: { "Fn::GetAtt": [ LambdaFunctionExecutionRole, Arn ] }
+      Timeout: { Ref: Timeout }
+      Handler: index.handler
+      Runtime: python2.7
+      MemorySize: { Ref: MemorySize }
+
+
+  # The IAM role that the lambda function will execute under.
+  LambdaFunctionExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: [ lambda.amazonaws.com ]
+            Action:
+              - sts:AssumeRole
+      Path: /
+      Policies:
+        - PolicyName: WriteLogsToCloudWatch
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - "logs:CreateLogGroup"
+                  - "logs:CreateLogStream"
+                  - "logs:PutLogEvents"
+                Resource: "arn:aws:logs:*:*:*"
+
+      # # Optional:
+      # ManagedPolicyArns:
+      #   - arn:aws:iam::aws:policy/AmazonEC2ReadOnlyAccess
+
+
+  # Permits the events service to invoke the service.
+  LambdaPermission:
+    Type: AWS::Lambda::Permission
+    Condition: HasSchedule
+    Properties:
+      Action: lambda:InvokeFunction
+      SourceArn:
+        "Fn::GetAtt": [ ScheduledRule, Arn ]
+      FunctionName: { "Fn::GetAtt": [ LambdaFunction, Arn ] }
+      Principal: events.amazonaws.com
+
+
+  # The cron rule for the execution.
+  ScheduledRule:
+    Type: AWS::Events::Rule
+    Condition: HasSchedule
+    Properties:
+      Description:
+        "Fn::Sub":
+          "Scheduled rule for ${ResourcePrefix}"
+      ScheduleExpression: { Ref : ScheduleExpression }
+      State: ENABLED
+      Targets:
+        - Arn: { "Fn::GetAtt": [ LambdaFunction, Arn ] }
+          Id: ScheduledRule
+
+Outputs:
+  LambdaFunction:
+    Value: { Ref : LambdaFunction }
+  LambdaFunctionARN:
+    Value: { "Fn::GetAtt": [ LambdaFunction, Arn ] }
+  LambdaFunctionExecutionRole:
+    Value: { Ref : LambdaFunctionExecutionRole }
+  LambdaFunctionExecutionRoleARN:
+    Value: { "Fn::GetAtt": [ LambdaFunctionExecutionRole, Arn ] }

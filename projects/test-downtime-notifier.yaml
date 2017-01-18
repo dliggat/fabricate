@@ -1,0 +1,11 @@
+template: downtime_notifier
+
+# subscriptions:
+#   - endpoint: test@test.com
+#     protocol: email
+
+parameters:
+  ScheduleExpression: "rate(24 hours)"
+  Timeout: "300"
+  MemorySize: "256"
+  SnsDisplayName: "Downtime Notifier"
