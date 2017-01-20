@@ -1,0 +1,7 @@
+template: lambda_function
+
+parameters:
+  ResourcePrefix: local-development
+  ScheduleExpression: "rate(24 hours)"
+  Timeout: "300"
+  MemorySize: "256"

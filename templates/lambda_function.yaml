@@ -55,6 +55,40 @@ Resources:
       Runtime: python2.7
       MemorySize: { Ref: MemorySize }
 
+  Policy:
+    Type: AWS::IAM::Policy
+    Properties:
+      Roles:
+        - { Ref: LambdaFunctionExecutionRole }
+      Users:
+        - { Ref: LocalDevelopmentUser }
+      PolicyName: CommonPolicyForLambdaAndDevelopment
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Action:
+              - "logs:CreateLogGroup"
+              - "logs:CreateLogStream"
+              - "logs:PutLogEvents"
+            Resource: "arn:aws:logs:*:*:*"
+          - Effect: Allow
+            Action:
+              - "s3:Get*"
+              - "s3:List*"
+            Resource: "*"
+          - Effect: Allow
+            Action:
+              - "ec2:DescribeSecurityGroups"
+            Resource: "*"
+
+  LocalDevelopmentUser:
+    Type: AWS::IAM::User
+    # # Optional:
+    # Properties:
+    #   ManagedPolicyArns:
+    #     - arn:aws:iam::aws:policy/AmazonEC2ReadOnlyAccess
+
 
   # The IAM role that the lambda function will execute under.
   LambdaFunctionExecutionRole:
@@ -69,18 +103,6 @@ Resources:
             Action:
               - sts:AssumeRole
       Path: /
-      Policies:
-        - PolicyName: WriteLogsToCloudWatch
-          PolicyDocument:
-            Version: "2012-10-17"
-            Statement:
-              - Effect: Allow
-                Action:
-                  - "logs:CreateLogGroup"
-                  - "logs:CreateLogStream"
-                  - "logs:PutLogEvents"
-                Resource: "arn:aws:logs:*:*:*"
-
       # # Optional:
       # ManagedPolicyArns:
       #   - arn:aws:iam::aws:policy/AmazonEC2ReadOnlyAccess
@@ -121,3 +143,5 @@ Outputs:
     Value: { Ref : LambdaFunctionExecutionRole }
   LambdaFunctionExecutionRoleARN:
     Value: { "Fn::GetAtt": [ LambdaFunctionExecutionRole, Arn ] }
+  LocalDevelopmentUser:
+    Value: { Ref : LambdaFunctionExecutionRole }
