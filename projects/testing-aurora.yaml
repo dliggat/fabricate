@@ -1,0 +1,14 @@
+template: aurora
+
+parameters:
+  ResourcePrefix: testing-aurora
+  VpcExportIdentifier: dliggat-vpc-VpcId
+  SubnetAZ0ExportIdentifier: dliggat-vpc-PrivateSubnetAZ0
+  SubnetAZ1ExportIdentifier: dliggat-vpc-PrivateSubnetAZ1
+  SubnetAZ2ExportIdentifier: dliggat-vpc-PrivateSubnetAZ2
+  DBIngressSecurityGroupExportIdentifier: tam-demo-amazon-linux-SgId
+  DbInstanceClass: db.r3.large
+  DatabaseUsername: foobarbaz
+  DatabasePassword: foobarbaz
+
+# psql --host=td15y3lhrreo9jr.cp4cdogz9hsy.us-west-2.rds.amazonaws.com --port=5432 --dbname=tamdemodb --username=foobarbaz --password

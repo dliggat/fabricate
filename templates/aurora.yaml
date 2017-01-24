@@ -1,0 +1,282 @@
+AWSTemplateFormatVersion: "2010-09-09"
+
+Description: {{ metadata['description'] }}
+
+Metadata:
+  CommitHash: {{ metadata['commit_hash'] }}
+  CommitMessage: {{ metadata['commit_message'] }}
+
+
+Parameters:
+  ResourcePrefix:
+    Type: String
+  DbInstanceClass:
+    Default: db.r3.large
+    Description: The instance type to use for the database.
+    Type: String
+  DatabasePassword:
+    AllowedPattern: "[a-zA-Z0-9]+"
+    ConstraintDescription: must contain only alphanumeric characters.
+    Description: The database admin account password.
+    MaxLength: '41'
+    MinLength: '8'
+    NoEcho: 'true'
+    Type: String
+  DatabaseUsername:
+    AllowedPattern: "[a-zA-Z0-9]+"
+    ConstraintDescription: must contain only alphanumeric characters.
+    Description: The database admin account user name.
+    MaxLength: '16'
+    MinLength: '1'
+    Type: String
+  DatabaseBackupRetentionPeriod:
+    Type: String
+    Default: 7
+    AllowedValues:
+      - 1
+      - 7
+    Description: The database backup retention period in days.
+  # DatabaseSubnets:
+  #   Description: The subnets to place database instances in.
+  #   Type: List<AWS::EC2::Subnet::Id>
+  # DatabaseSecurityGroups:
+  #   Type: List<AWS::EC2::SecurityGroup::Id>
+  #   Description: Security groups to apply to the RDS cluster.
+
+  VpcExportIdentifier:
+    Type: String
+
+  SubnetAZ0ExportIdentifier:
+    Type: String
+
+  SubnetAZ1ExportIdentifier:
+    Type: String
+
+  SubnetAZ2ExportIdentifier:
+    Type: String
+
+  DBIngressSecurityGroupExportIdentifier:
+    Type: String
+    Default: ""
+
+Conditions:
+  NoDbIngressSecurityGroup:
+    "Fn::Equals":
+      - { Ref: DBIngressSecurityGroupExportIdentifier }
+      - ""
+
+Resources:
+  StackAlarmTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      DisplayName: Stack Alarm Topic
+
+  DatabaseSubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupDescription: Subnet group for the RDS instance
+      SubnetIds:
+        - "Fn::ImportValue": { Ref: SubnetAZ0ExportIdentifier }
+        - "Fn::ImportValue": { Ref: SubnetAZ1ExportIdentifier }
+        - "Fn::ImportValue": { Ref: SubnetAZ2ExportIdentifier }
+      Tags:
+        - Key: Name
+          Value:
+            "Fn::Join":
+              - "-"
+              - - { Ref: ResourcePrefix }
+                - "subnet-group"
+
+  DatabaseSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      VpcId:
+        "Fn::ImportValue": { Ref: VpcExportIdentifier }
+      SecurityGroupIngress:
+        - "Fn::If":
+          - NoDbIngressSecurityGroup
+          - { Ref: "AWS::NoValue" }
+          - SourceSecurityGroupId: { "Fn::ImportValue" : { Ref: DBIngressSecurityGroupExportIdentifier } }
+            IpProtocol: tcp
+            FromPort: 3306
+            ToPort: 3306
+      GroupDescription: Security group for RDS
+      Tags:
+        - Key: Name
+          Value:
+            "Fn::Join":
+              - "-"
+              - - { Ref: ResourcePrefix }
+                - "sg"
+
+  DatabaseCluster:
+    Type: AWS::RDS::DBCluster
+    DeletionPolicy: Snapshot
+    Properties:
+      Engine: aurora
+      MasterUsername: { Ref: DatabaseUsername }
+      MasterUserPassword: { Ref: DatabasePassword }
+      BackupRetentionPeriod: { Ref: DatabaseBackupRetentionPeriod }
+      PreferredBackupWindow: 02:00-03:00
+      PreferredMaintenanceWindow: mon:03:00-mon:04:00
+      DBSubnetGroupName: { Ref: DatabaseSubnetGroup }
+      VpcSecurityGroupIds:
+        - "Fn::GetAtt": [ DatabaseSecurityGroup, GroupId ]
+  DatabasePrimaryInstance:
+    Type: AWS::RDS::DBInstance
+    Properties:
+      Engine: aurora
+      DBClusterIdentifier:
+        { Ref: DatabaseCluster }
+      DBInstanceClass:
+        { Ref: DbInstanceClass }
+      DBSubnetGroupName:
+        { Ref: DatabaseSubnetGroup }
+      Tags:
+        - Key: Name
+          Value:
+            "Fn::Join":
+              - "-"
+              - - { Ref: ResourcePrefix }
+                - "db-primary"
+  DatabaseReplicaInstance:
+    Type: AWS::RDS::DBInstance
+    Properties:
+      Engine: aurora
+      DBClusterIdentifier:
+        { Ref: DatabaseCluster }
+      DBInstanceClass:
+        { Ref: DbInstanceClass }
+      DBSubnetGroupName:
+        { Ref: DatabaseSubnetGroup }
+      Tags:
+        - Key: Name
+          Value:
+            "Fn::Join":
+              - "-"
+              - - { Ref: ResourcePrefix }
+                - "db-replica"
+  DatabasePrimaryCPUAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmDescription: Primary database CPU utilization is over 80%.
+      Namespace: AWS/RDS
+      MetricName: CPUUtilization
+      Unit: Percent
+      Statistic: Average
+      Period: 300
+      EvaluationPeriods: 2
+      Threshold: 80
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      Dimensions:
+        - Name: DBInstanceIdentifier
+          Value: { Ref: DatabasePrimaryInstance }
+      AlarmActions:
+        - { Ref: StackAlarmTopic }
+      InsufficientDataActions:
+        - { Ref: StackAlarmTopic }
+  DatabaseReplicaCPUAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmDescription: Replica database CPU utilization is over 80%.
+      Namespace: AWS/RDS
+      MetricName: CPUUtilization
+      Unit: Percent
+      Statistic: Average
+      Period: 300
+      EvaluationPeriods: 2
+      Threshold: 80
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      Dimensions:
+        - Name: DBInstanceIdentifier
+          Value: { Ref: DatabaseReplicaInstance }
+      AlarmActions:
+        - { Ref: StackAlarmTopic }
+      InsufficientDataActions:
+        - { Ref: StackAlarmTopic }
+  DatabasePrimaryMemoryAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmDescription: Primary database freeable memory is under 700MB.
+      Namespace: AWS/RDS
+      MetricName: FreeableMemory
+      Unit: Bytes
+      Statistic: Average
+      Period: 300
+      EvaluationPeriods: 2
+      Threshold: 700000000
+      ComparisonOperator: LessThanOrEqualToThreshold
+      Dimensions:
+        - Name: DBInstanceIdentifier
+          Value: { Ref: DatabasePrimaryInstance }
+      AlarmActions:
+        - { Ref: StackAlarmTopic }
+      InsufficientDataActions:
+        - { Ref: StackAlarmTopic }
+  DatabasePrimaryMemoryAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmDescription: Replica database freeable memory is under 700MB.
+      Namespace: AWS/RDS
+      MetricName: FreeableMemory
+      Unit: Bytes
+      Statistic: Average
+      Period: 300
+      EvaluationPeriods: 2
+      Threshold: 700000000
+      ComparisonOperator: LessThanOrEqualToThreshold
+      Dimensions:
+        - Name: DBInstanceIdentifier
+          Value: { Ref: DatabaseReplicaInstance }
+      AlarmActions:
+        - { Ref: StackAlarmTopic }
+      InsufficientDataActions:
+        - { Ref: StackAlarmTopic }
+  DatabasePrimaryReplicationAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmDescription: Database replication latency is over 200ms.
+      Namespace: AWS/RDS
+      MetricName: AuroraReplicaLag
+      Unit: Milliseconds
+      Statistic: Average
+      Period: 300
+      EvaluationPeriods: 2
+      Threshold: 200
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      Dimensions:
+        - Name: DBInstanceIdentifier
+          Value: { Ref: DatabaseReplicaInstance }
+      AlarmActions:
+        - { Ref: StackAlarmTopic }
+  DatabaseReplicaReplicationAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmDescription: Database replication latency is over 200ms.
+      Namespace: AWS/RDS
+      MetricName: AuroraReplicaLag
+      Unit: Milliseconds
+      Statistic: Average
+      Period: 300
+      EvaluationPeriods: 2
+      Threshold: 200
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      Dimensions:
+        - Name: DBInstanceIdentifier
+          Value: { Ref: DatabaseReplicaInstance }
+      AlarmActions:
+        - { Ref: StackAlarmTopic }
+
+Outputs:
+  PrimaryDbEndpointHost:
+    Value:
+      "Fn::GetAtt": [ DatabasePrimaryInstance, Endpoint.Address ]
+  PrimaryDbEndpointPort:
+    Value:
+      "Fn::GetAtt": [ DatabasePrimaryInstance, Endpoint.Port ]
+  ReplicaDbEndpointHost:
+    Value:
+      "Fn::GetAtt": [ DatabaseReplicaInstance, Endpoint.Address ]
+  ReplicaDbEndpointPort:
+    Value:
+      "Fn::GetAtt": [ DatabaseReplicaInstance, Endpoint.Port ]
