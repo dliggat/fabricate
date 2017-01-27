@@ -1,5 +1,7 @@
 # Fabricate
 
+A Python [Fabric](http://www.fabfile.org/) based set of conventions for AWS CloudFormation.
+
 ## Install
 
 1. Set up a `virtualenv` (I recommend [`pyenv-virtualenv`](https://github.com/yyuu/pyenv-virtualenv), highly):
