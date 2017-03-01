@@ -110,7 +110,8 @@ Resources:
         # ComplianceResourceId:
         #   Ref: Ec2Volume
         ComplianceResourceTypes:
-          - "AWS::IAM::User"
+          # - "AWS::IAM::User"
+          - "AWS::EC2::Instance"
       Source:
         Owner: "CUSTOM_LAMBDA"
         SourceDetails:

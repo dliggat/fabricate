@@ -70,7 +70,12 @@ Resources:
             Resource: "arn:aws:logs:*:*:*"
           - Effect: Allow
             Action:
-              - "ec2:DescribeSecurityGroups"
+              - "ec2:*"
+            Resource: "*"
+          - Effect: Allow
+            Action:
+              - "lambda:InvokeFunction"
+              - "lambda:UpdateFunctionConfiguration"
             Resource: "*"
 
 
@@ -84,6 +89,11 @@ Resources:
           - Effect: Allow
             Principal:
               Service: [ lambda.amazonaws.com ]
+            Action:
+              - sts:AssumeRole
+          - Effect: Allow
+            Principal:
+              Service: [ lex.amazonaws.com ]
             Action:
               - sts:AssumeRole
           - Effect: Allow

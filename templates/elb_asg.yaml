@@ -1,0 +1,252 @@
+AWSTemplateFormatVersion: "2010-09-09"
+
+Description: {{ metadata['description'] }}
+
+Metadata:
+  CommitHash: {{ metadata['commit_hash'] }}
+  CommitMessage: {{ metadata['commit_message'] }}
+
+Parameters:
+  ResourcePrefix:
+    Type: String
+
+  VpcExportIdentifier:
+    Type: String
+
+  PublicSubnetAZ0ExportIdentifier:
+    Type: String
+
+  PublicSubnetAZ1ExportIdentifier:
+    Type: String
+
+  PrivateSubnetAZ0ExportIdentifier:
+    Type: String
+
+  PrivateSubnetAZ1ExportIdentifier:
+    Type: String
+
+  KeypairName:
+    Type: AWS::EC2::KeyPair::KeyName
+
+  AmiId:
+    Type: AWS::EC2::Image::Id
+
+  InstanceType:
+    Type: String
+    Description: The size of the instance
+
+
+Resources:
+  IamRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: 'PermitAssumeRoleEc2'
+            Action:
+              - sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service:
+                - ec2.amazonaws.com
+      Path: /
+      Policies:
+        - PolicyName: GetObjects
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - "ec2:DescribeSecurityGroups"
+                Resource: "*"
+
+  IamProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Path: /
+      Roles:
+        - Ref: IamRole
+
+  InstanceSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      VpcId:
+        "Fn::ImportValue": { Ref: VpcExportIdentifier }
+      GroupDescription:
+        "Fn::Join":
+          - "-"
+          - - { Ref: ResourcePrefix }
+            - "sg"
+      Tags:
+        - Key: Name
+          Value:
+            "Fn::Join":
+              - "-"
+              - - { Ref: ResourcePrefix }
+                - "sg"
+
+  InstanceSecurityGroupSshIngress:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: { Ref: InstanceSecurityGroup }
+      CidrIp: "0.0.0.0/0"
+      IpProtocol: tcp
+      FromPort: 22
+      ToPort: 22
+
+  InstanceSecurityGroupHttpIngress:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: { Ref: InstanceSecurityGroup }
+      CidrIp: "0.0.0.0/0"
+      IpProtocol: tcp
+      FromPort: 80
+      ToPort: 80
+
+  InstanceSecurityGroupElbIngress:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: { Ref: InstanceSecurityGroup }
+      SourceSecurityGroupId: { Ref: ElbSecurityGroup }
+      IpProtocol: tcp
+      FromPort: 80
+      ToPort: 80
+
+  LaunchConfig:
+    Type: AWS::AutoScaling::LaunchConfiguration
+    Properties:
+      ImageId: { Ref: AmiId }
+      KeyName: { Ref: KeypairName }
+      IamInstanceProfile: { Ref: IamProfile }
+      InstanceType: { Ref: InstanceType }
+      SecurityGroups:
+        - { Ref: InstanceSecurityGroup }
+      UserData:
+        "Fn::Base64":
+          "Fn::Join":
+            - "\n"
+            - - "#!/bin/bash"
+              - ""
+              - "yum update -y"
+              - "yum install -y httpd24"
+              - "service httpd start"
+              - "echo '<html><h1>' Hello from $(hostname) '</h1></html>' > /var/www/html/index.html"
+              - "chkconfig httpd on"
+
+  Asg:
+    Type: AWS::AutoScaling::AutoScalingGroup
+    Properties:
+      Tags:
+        - Key: Name
+          Value:
+            "Fn::Join":
+              - "-"
+              - - { Ref: ResourcePrefix }
+                - "asg"
+                - "instance"
+          PropagateAtLaunch: true
+      MinSize: 2
+      MaxSize: 2
+      LoadBalancerNames:
+        - "Fn::Join":
+          - "-"
+          - - { Ref: ResourcePrefix }
+            - "elb"
+      LaunchConfigurationName: { Ref: LaunchConfig }
+      VPCZoneIdentifier:
+        - "Fn::ImportValue": { Ref: PublicSubnetAZ0ExportIdentifier }
+        - "Fn::ImportValue": { Ref: PublicSubnetAZ1ExportIdentifier }
+
+  Elb:
+    Type: AWS::ElasticLoadBalancing::LoadBalancer
+    Properties:
+      # AppCookieStickinessPolicy:
+      #   - AppCookieStickinessPolicy
+      ConnectionDrainingPolicy:
+        Enabled: "True"
+        Timeout: 45
+      ConnectionSettings:
+        IdleTimeout: 30
+      CrossZone: "True"
+      HealthCheck:
+        HealthyThreshold: 3
+        Interval: 5
+        Target: 'TCP:80'
+        Timeout: 3
+        UnhealthyThreshold: 5
+      # HealthCheck:
+      #   HealthyThreshold: 3
+      #   Interval: 5
+      #   Target: 'HTTP:80/'
+      #   Timeout: 3
+      #   UnhealthyThreshold: 5
+      # LBCookieStickinessPolicy:
+      #   - LBCookieStickinessPolicy
+      LoadBalancerName:
+        "Fn::Join":
+          - "-"
+          - - { Ref: ResourcePrefix }
+            - "elb"
+      Listeners:
+        - InstancePort: 80
+          InstanceProtocol: HTTP
+          LoadBalancerPort: 80
+          Protocol: HTTP
+      # Policies:
+      #   - ElasticLoadBalancing Policy
+      Scheme: internet-facing
+      SecurityGroups:
+        - { Ref: ElbSecurityGroup }
+      Subnets:
+        - "Fn::ImportValue": { Ref: PublicSubnetAZ0ExportIdentifier }
+        - "Fn::ImportValue": { Ref: PublicSubnetAZ1ExportIdentifier }
+      Tags:
+        - Key: Name
+          Value:
+            "Fn::Join":
+              - "-"
+              - - { Ref: ResourcePrefix }
+                - "elb"
+
+  ElbSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      VpcId:
+        "Fn::ImportValue": { Ref: VpcExportIdentifier }
+      GroupDescription:
+        "Fn::Join":
+          - "-"
+          - - { Ref: ResourcePrefix }
+            - "elb"
+            - "sg"
+      Tags:
+        - Key: Name
+          Value:
+            "Fn::Join":
+              - "-"
+              - - { Ref: ResourcePrefix }
+                - "elb"
+                - "sg"
+
+  ElbSecurityGroupHttpIngress:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: { Ref: ElbSecurityGroup }
+      CidrIp: "0.0.0.0/0"
+      IpProtocol: tcp
+      FromPort: 80
+      ToPort: 80
+
+Outputs:
+  ElbDns:
+    Value:
+      "Fn::GetAtt": [Elb, DNSName]
+  SgIdExport:
+    Value: { Ref: InstanceSecurityGroup }
+    Export:
+      Name:
+        "Fn::Join":
+          - "-"
+          - - { Ref: ResourcePrefix }
+            - "SgId"

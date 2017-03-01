@@ -25,12 +25,14 @@ Parameters:
     Type: Number
     Description: Memory for the function in MB
 
+
 Conditions:
   HasSchedule:
     "Fn::Not":
       - "Fn::Equals":
           - { Ref: ScheduleExpression }
           - ""
+
 
 Resources:
   LambdaFunction:
@@ -58,6 +60,8 @@ Resources:
     Properties:
       Roles:
         - { Ref: LambdaFunctionExecutionRole }
+      Users:
+        - { Ref: LocalDevelopmentUser }
       PolicyName: CommonPolicyForLambdaAndDevelopment
       PolicyDocument:
         Version: "2012-10-17"
@@ -72,6 +76,19 @@ Resources:
             Action:
               - "ec2:DescribeSecurityGroups"
             Resource: "*"
+          - Effect: Allow
+            Action:
+              - "cloudwatch:GetMetricData"
+              - "cloudwatch:GetMetricStatistics"
+              - "cloudwatch:PutMetricData"
+            Resource: "*"
+
+  LocalDevelopmentUser:
+    Type: AWS::IAM::User
+    # # Optional:
+    # Properties:
+    #   ManagedPolicyArns:
+    #     - arn:aws:iam::aws:policy/AmazonEC2ReadOnlyAccess
 
 
   # The IAM role that the lambda function will execute under.
@@ -84,17 +101,6 @@ Resources:
           - Effect: Allow
             Principal:
               Service: [ lambda.amazonaws.com ]
-            Action:
-              - sts:AssumeRole
-          - Effect: Allow
-            Principal:
-              AWS:
-                - "Fn::Join":
-                  - ""
-                  - - "arn:aws:iam::"
-                    - { Ref: "AWS::AccountId" }
-                    - ":"
-                    - "root"
             Action:
               - sts:AssumeRole
       Path: /
@@ -138,12 +144,5 @@ Outputs:
     Value: { Ref : LambdaFunctionExecutionRole }
   LambdaFunctionExecutionRoleARN:
     Value: { "Fn::GetAtt": [ LambdaFunctionExecutionRole, Arn ] }
-  SigninUrl:
-    Value:
-      "Fn::Join":
-        - ""
-        - - "https://signin.aws.amazon.com/switchrole?account="
-          - { Ref: "AWS::AccountId" }
-          - "&roleName="
-          - { Ref : LambdaFunctionExecutionRole }
-          - "&displayName=assumed-role"
+  LocalDevelopmentUser:
+    Value: { Ref : LambdaFunctionExecutionRole }
