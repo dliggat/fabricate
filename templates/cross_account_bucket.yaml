@@ -1,0 +1,72 @@
+# Cross account role that permits assumer to upload to bucket.
+
+AWSTemplateFormatVersion: "2010-09-09"
+
+Description: {{ metadata['description'] }}
+
+Parameters:
+  TrustedAwsAccountId:
+    Type: String
+    Description: The account ID to trust
+
+Resources:
+  Bucket:
+    Type: AWS::S3::Bucket
+
+  CrossAccountRole:
+    Type: AWS::IAM::Role
+    Properties:
+      Policies:
+        - PolicyName: permit-bucket-access
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Action:
+                - "s3:ListAllMyBuckets"
+                - "s3:GetBucketLocation"
+                Effect: Allow
+                Resource: "arn:aws:s3:::*"
+              - Action: ['s3:ListBucket']
+                Effect: Allow
+                Resource:
+                  "Fn::Join":
+                    - ""
+                    - - "arn:aws:s3:::"
+                      - { Ref: Bucket }
+              - Action:
+                - 's3:GetObject'
+                - 's3:PutObject'
+                - 's3:GetObjectAcl'
+                - 's3:PutObjectAcl'
+                Effect: Allow
+                Resource:
+                  "Fn::Join":
+                    - ""
+                    - - "arn:aws:s3:::"
+                      - { Ref: Bucket }
+                      - "/*"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Action: "sts:AssumeRole"
+            Principal:
+              AWS: { Ref: TrustedAwsAccountId }
+
+
+Outputs:
+  Bucket:
+    Value:
+      "Fn::Join":
+        - ""
+        - - "s3://"
+          - { Ref: Bucket }
+
+  SigninUrl:
+    Value:
+      "Fn::Join":
+        - ""
+        - - "https://signin.aws.amazon.com/switchrole?account="
+          - { Ref: "AWS::AccountId" }
+          - "&roleName="
+          - { Ref: CrossAccountRole }
