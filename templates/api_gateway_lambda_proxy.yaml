@@ -22,7 +22,7 @@ Resources:
               - "    response = {"
               - "        'statusCode': 200,"
               - "        'headers': { 'x-custom-header' : 'my custom header value' },"
-              - "        'body': json.dumps(event)"
+              - "        'body': json.dumps({'myApiReturnObject': event})"
               - "    }"
               - "    return response"
       Description: A myresource function
