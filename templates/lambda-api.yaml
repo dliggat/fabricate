@@ -1,9 +1,11 @@
+# Reference: https://blog.jayway.com/2016/08/17/introduction-to-cloudformation-for-api-gateway/
 AWSTemplateFormatVersion: "2010-09-09"
-# Description: {{ metadata["description"] }}
+Description: {{ metadata["description"] }}
 
-# Metadata:
-#   CommitHash: {{ metadata["commit_hash"] }}
-#   CommitMessage: {{ metadata["commit_message"] }}
+Metadata:
+  CommitHash: {{ metadata["commit_hash"] }}
+  CommitMessage: {{ metadata["commit_message"] }}
+
 Resources:
   GreetingLambda:
     Type: AWS::Lambda::Function
@@ -16,15 +18,11 @@ Resources:
             - - "import json"
               - "def handler(event, context):"
               - "    print('Event: ' + json.dumps(event))"
-              - "    return { 'greeting': 'Hello, ' + event.name + '!' }"
-        # ZipFile: !Join ["
-
-        #     ", ["""use strict"";", "", // Greeter Lambda, "exports.handler = (event,
-        #       context, callback) => {", "  console.log(""Event:"", JSON.stringify(event));",
-        #     "  const name = event.name || ""World"";", "  const response = {greeting:
-        #       `Hello, ${name}!`};", "  callback(null, response);", "};"]]
+              - "    message = 'World'"
+              - "    if 'name' in event and len(event['name']):"
+              - "        message = event['name']"
+              - "    return { 'greeting': 'Hello, ' + message + '!' }"
       Description: A greeting function
-      FunctionName: GreetingLambda
       Handler: index.handler
       Role:
         "Fn::GetAtt": [LambdaExecutionRole, Arn]
@@ -40,13 +38,17 @@ Resources:
             Principal:
               Service: [lambda.amazonaws.com]
             Action: ["sts:AssumeRole"]
-        Statement:
-          - Effect: Allow
-            Action:
-              - "logs:CreateLogGroup"
-              - "logs:CreateLogStream"
-              - "logs:PutLogEvents"
-            Resource: "arn:aws:logs:*:*:*"
+      Policies:
+        - PolicyName: LambdaRole
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - "logs:CreateLogGroup"
+                  - "logs:CreateLogStream"
+                  - "logs:PutLogEvents"
+                Resource: "arn:aws:logs:*:*:*"
       # ManagedPolicyArns: ["arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"]
 
   GreetingApi:
@@ -137,7 +139,8 @@ Resources:
       AuthorizationType: NONE
       HttpMethod: ANY
       Integration:
-        Type: AWS_PROXY
+        # Type: AWS_PROXY
+        Type: AWS
         IntegrationHttpMethod: POST
         Uri:
           "Fn::Join":
@@ -174,3 +177,17 @@ Outputs:
           - .execute-api.
           - { Ref: "AWS::Region" }
           - ".amazonaws.com"
+
+  CurlCommand:
+    Description: Curl command for the endpoint
+    Value:
+      "Fn::Join":
+        - ""
+        - - "curl "
+          - "https://"
+          - { Ref: "GreetingApi" }
+          - .execute-api.
+          - { Ref: "AWS::Region" }
+          - ".amazonaws.com"
+          - "/LATEST/greeting"
+          - "?name=foobar"
