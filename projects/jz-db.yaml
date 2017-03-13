@@ -1,0 +1,20 @@
+template: rds
+
+parameters:
+  ResourcePrefix: jz-db
+  VpcExportIdentifier: dliggat-vpc-VpcId
+  SubnetAZ0ExportIdentifier: dliggat-vpc-PrivateSubnetAZ0
+  SubnetAZ1ExportIdentifier: dliggat-vpc-PrivateSubnetAZ1
+  DBIngressSecurityGroupExportIdentifier: '' #tam-demo-amazon-linux-SgId
+  DbName: jzdb
+  MultiAz: "true"
+  PubliclyAccessible: "false"
+  DbEngine: postgres
+  DbVersion: "9.4.5"
+  DbPort: "5432"
+  DbInstanceClass: db.t2.medium
+  AllocatedStorage: "10"
+  RdsUsername: foobarbaz
+  RdsPassword: foobarbaz
+
+# psql --host=td15y3lhrreo9jr.cp4cdogz9hsy.us-west-2.rds.amazonaws.com --port=5432 --dbname=tamdemodb --username=foobarbaz --password

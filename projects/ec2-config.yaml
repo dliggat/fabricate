@@ -1,0 +1,6 @@
+template: custom_config_lambda
+
+parameters:
+  ResourcePrefix: ec2config
+  Timeout: "300"
+  MemorySize: "256"

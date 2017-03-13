@@ -1,0 +1,7 @@
+template: custom_cw_metric
+
+parameters:
+  ResourcePrefix: elb-cw-metric
+  ScheduleExpression: "rate(1 minute)"
+  Timeout: "300"
+  MemorySize: "256"

@@ -1,0 +1,12 @@
+template: elb_asg
+
+parameters:
+  ResourcePrefix: elb-demo
+  VpcExportIdentifier: dliggat-vpc-VpcId
+  PublicSubnetAZ0ExportIdentifier: dliggat-vpc-PublicSubnetAZ0
+  PublicSubnetAZ1ExportIdentifier: dliggat-vpc-PublicSubnetAZ1
+  PrivateSubnetAZ0ExportIdentifier: dliggat-vpc-PrivateSubnetAZ0
+  PrivateSubnetAZ1ExportIdentifier: dliggat-vpc-PrivateSubnetAZ1
+  KeypairName: dliggat-tam
+  AmiId: ami-1e299d7e
+  InstanceType: t2.medium
