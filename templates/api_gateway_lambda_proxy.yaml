@@ -1,0 +1,190 @@
+# Reference: https://blog.jayway.com/2016/08/17/introduction-to-cloudformation-for-api-gateway/
+AWSTemplateFormatVersion: "2010-09-09"
+Description: {{ metadata["description"] }}
+
+Metadata:
+  CommitHash: {{ metadata["commit_hash"] }}
+  CommitMessage: {{ metadata["commit_message"] }}
+
+Resources:
+  GatewayLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      Code:
+      Code:
+        ZipFile:
+          "Fn::Join":
+            - "\n"
+            - - "import json"
+              - "def handler(event, context):"
+              - "    print('Event: ' + json.dumps(event))"
+              - "    print('Context:' + str(dir(context)))"
+              - "    response = {"
+              - "        'statusCode': 200,"
+              - "        'headers': { 'x-custom-header' : 'my custom header value' },"
+              - "        'body': json.dumps(event)"
+              - "    }"
+              - "    return response"
+      Description: A myresource function
+      Handler: index.handler
+      Role:
+        "Fn::GetAtt": [LambdaExecutionRole, Arn]
+      Runtime: python2.7
+
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: [lambda.amazonaws.com]
+            Action: ["sts:AssumeRole"]
+      Policies:
+        - PolicyName: LambdaRole
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - "logs:CreateLogGroup"
+                  - "logs:CreateLogStream"
+                  - "logs:PutLogEvents"
+                Resource: "arn:aws:logs:*:*:*"
+      # ManagedPolicyArns: ["arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"]
+
+  GatewayApi:
+    Type: AWS::ApiGateway::RestApi
+    Properties:
+      Name: Gateway API
+      Description: API used for Gateway requests
+      FailOnWarnings: true
+
+  LambdaPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:invokeFunction
+      FunctionName:
+        "Fn::GetAtt": [GatewayLambda, Arn]
+      Principal: apigateway.amazonaws.com
+      SourceArn:
+        "Fn::Join":
+          - ""
+          - - "arn:aws:execute-api:"
+            - { Ref: "AWS::Region" }
+            - ":"
+            - { Ref: "AWS::AccountId" }
+            - ":"
+            - { Ref: "GatewayApi" }
+            - "/*"
+
+  ApiGatewayCloudWatchLogsRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service: [apigateway.amazonaws.com]
+          Action: ["sts:AssumeRole"]
+      Policies:
+      - PolicyName: ApiGatewayLogsPolicy
+        PolicyDocument:
+          Version: "2012-10-17"
+          Statement:
+          - Effect: Allow
+            Action:
+              - "logs:CreateLogGroup"
+              - "logs:CreateLogStream"
+              - "logs:DescribeLogGroups"
+              - "logs:DescribeLogStreams"
+              - "logs:PutLogEvents"
+              - "logs:GetLogEvents"
+              - "logs:FilterLogEvents"
+            Resource: "*"
+
+  ApiGatewayAccount:
+    Type: AWS::ApiGateway::Account
+    Properties:
+      CloudWatchRoleArn:
+        "Fn::GetAtt": [ApiGatewayCloudWatchLogsRole, Arn]
+
+  GatewayApiStage:
+    DependsOn: [ApiGatewayAccount]
+    Type: AWS::ApiGateway::Stage
+    Properties:
+      DeploymentId: { Ref: "ApiDeployment" }
+      MethodSettings:
+      - DataTraceEnabled: true
+        HttpMethod: "*"
+        LoggingLevel: INFO
+        ResourcePath: /*
+      RestApiId: { Ref: "GatewayApi" }
+      StageName: LATEST
+
+  ApiDeployment:
+    Type: AWS::ApiGateway::Deployment
+    DependsOn: [GatewayRequest]
+    Properties:
+      RestApiId: { Ref: "GatewayApi" }
+      StageName: DummyStage
+
+  MyResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: { Ref: "GatewayApi" }
+      ParentId:
+        "Fn::GetAtt": [GatewayApi, RootResourceId]
+      PathPart: "{proxy+}"
+
+  GatewayRequest:
+    DependsOn: LambdaPermission
+    Type: AWS::ApiGateway::Method
+    Properties:
+      AuthorizationType: NONE
+      HttpMethod: ANY
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri:
+          "Fn::Join":
+            - ""
+            - - "arn:aws:apigateway:"
+              - { Ref: "AWS::Region" }
+              - ":lambda:path/2015-03-31/functions/"
+              - "Fn::GetAtt": [GatewayLambda, Arn]
+              - "/invocations"
+      ResourceId: { Ref: "MyResource" }
+      RestApiId: { Ref: "GatewayApi" }
+      MethodResponses:
+      - StatusCode: 200
+
+Outputs:
+  RootUrl:
+    Description: Root URL of the API gateway
+    Value:
+      "Fn::Join":
+        - ""
+        - - "https://"
+          - { Ref: "GatewayApi" }
+          - .execute-api.
+          - { Ref: "AWS::Region" }
+          - ".amazonaws.com"
+
+  CurlCommand:
+    Description: Curl command for the endpoint
+    Value:
+      "Fn::Join":
+        - ""
+        - - "curl "
+          - " 2>/dev/null "
+          - "https://"
+          - { Ref: "GatewayApi" }
+          - .execute-api.
+          - { Ref: "AWS::Region" }
+          - ".amazonaws.com"
+          - "/LATEST/"
+          - "any-string/goes-here"
+          - " | jq"
