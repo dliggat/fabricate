@@ -1,1 +1,4 @@
 template: api_gateway_lambda_proxy
+
+parameters:
+  ResourcePrefix: proxy-api-gateway

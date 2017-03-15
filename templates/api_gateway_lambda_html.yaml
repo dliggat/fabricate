@@ -20,14 +20,19 @@ Resources:
         ZipFile:
           "Fn::Join":
             - "\n"
-            - - "import json"
+            - - "import datetime"
+              - "import json"
               - "def handler(event, context):"
               - "    print('Event: ' + json.dumps(event))"
               - "    print('Context:' + str(dir(context)))"
-              - "    message = 'World'"
-              - "    if 'name' in event and len(event['name']):"
-              - "        message = event['name']"
-              - "    return { 'myresource': 'Hello, ' + message + '!' }"
+              - "    time = datetime.datetime.now().isoformat()"
+              - "    response = {"
+              - "        'statusCode': 200,"
+              - "        'headers': { 'Content-Type'    : 'text/html',"
+              - "                     'x-custom-header' : 'my fancy custom header value'},"
+              - "        'body': '<html><h1>Hello World! It is ' + time + '!</h1></html>'"
+              - "    }"
+              - "    return response"
       Description: A myresource function
       Handler: index.handler
       Role:
@@ -144,8 +149,7 @@ Resources:
       RestApiId: { Ref: "GatewayApi" }
       ParentId:
         "Fn::GetAtt": [GatewayApi, RootResourceId]
-      # PathPart: "{proxy+}"
-      PathPart: myresource
+      PathPart: "{proxy+}"
 
   GatewayRequest:
     DependsOn: LambdaPermission
@@ -154,8 +158,7 @@ Resources:
       AuthorizationType: NONE
       HttpMethod: ANY
       Integration:
-        # Type: AWS_PROXY
-        Type: AWS
+        Type: AWS_PROXY
         IntegrationHttpMethod: POST
         Uri:
           "Fn::Join":
@@ -165,17 +168,6 @@ Resources:
               - ":lambda:path/2015-03-31/functions/"
               - "Fn::GetAtt": [GatewayLambda, Arn]
               - "/invocations"
-        IntegrationResponses:
-        - StatusCode: 200
-        RequestTemplates:
-          "application/json":
-            "Fn::Join":
-              - ''
-              - - '{'
-                - '  "name": "$input.params(''value'')"'  # Translate the 'value' param from querystring into 'name' JSON for the Lambda.
-                - '}'
-      RequestParameters:
-        method.request.querystring.value: false  # Not clear what this does. Thought it was for required/optional, but it's not.
       ResourceId: { Ref: "MyResource" }
       RestApiId: { Ref: "GatewayApi" }
       MethodResponses:
@@ -192,17 +184,5 @@ Outputs:
           - .execute-api.
           - { Ref: "AWS::Region" }
           - ".amazonaws.com"
-
-  CurlCommand:
-    Description: Curl command for the endpoint
-    Value:
-      "Fn::Join":
-        - ""
-        - - "curl "
-          - "https://"
-          - { Ref: "GatewayApi" }
-          - .execute-api.
-          - { Ref: "AWS::Region" }
-          - ".amazonaws.com"
-          - "/LATEST/myresource"
-          - "?value=foobar"
+          - "/LATEST/"
+          - "any-string/goes-here"

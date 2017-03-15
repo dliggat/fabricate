@@ -1,0 +1,4 @@
+template: api_gateway_lambda_html
+
+parameters:
+  ResourcePrefix: html-api-gateway
