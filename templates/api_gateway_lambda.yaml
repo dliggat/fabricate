@@ -27,7 +27,7 @@ Resources:
               - "    message = 'World'"
               - "    if 'name' in event and len(event['name']):"
               - "        message = event['name']"
-              - "    return { 'myresource': 'Hello, ' + message + '!' }"
+              - "    return { 'myresource': 'HELLO, ' + message + '!' }"
       Description: A myresource function
       Handler: index.handler
       Role:
