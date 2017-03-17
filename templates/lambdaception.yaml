@@ -42,7 +42,7 @@ Resources:
 
             def handler(event, context):
                 logger.info('Event: ' + json.dumps(event))
-                logger.info('Context:' + str(dir(context)))
+                logger.info('Context: ' + str(dir(context)))
                 return { 'message': 'Hello WORLD!' }
 
       Role: { "Fn::GetAtt": [ LambdaFunctionExecutionRole, Arn ] }
@@ -213,21 +213,12 @@ Outputs:
     Value: { "Fn::GetAtt": [ LambdaFunctionExecutionRole, Arn ] }
   SigninUrl:
     Value:
-      "Fn::Join":
-        - ""
-        - - "https://signin.aws.amazon.com/switchrole?account="
-          - { Ref: "AWS::AccountId" }
-          - "&roleName="
-          - { Ref : LambdaFunctionExecutionRole }
-          - "&displayName=assumed-role"
-
+      "Fn::Sub": |
+        https://signin.aws.amazon.com/switchrole?account=${AWS::AccountId}&roleName=${LambdaFunctionExecutionRole}&displayName=assumed-role
   TestCommand:
     Value:
-      "Fn::Join":
-        - ""
-        - - "aws lambda invoke --function-name "
-          - { Ref: LambdaFunction }
-          - " output.txt"
+      "Fn::Sub": |
+        aws lambda invoke --function-name ${LambdaFunction} /tmp/${LambdaFunction}-output.txt; cat /tmp/${LambdaFunction}-output.txt
 
   LambdaFunction2:
     Value: { Ref : LambdaFunction2 }
@@ -239,19 +230,9 @@ Outputs:
     Value: { "Fn::GetAtt": [ LambdaFunctionExecutionRole2, Arn ] }
   SigninUrl2:
     Value:
-      "Fn::Join":
-        - ""
-        - - "https://signin.aws.amazon.com/switchrole?account="
-          - { Ref: "AWS::AccountId" }
-          - "&roleName="
-          - { Ref : LambdaFunctionExecutionRole2 }
-          - "&displayName=assumed-role"
-
+      "Fn::Sub": |
+        https://signin.aws.amazon.com/switchrole?account=${AWS::AccountId}&roleName=${LambdaFunctionExecutionRole2}&displayName=assumed-role
   TestCommand2:
     Value:
-      "Fn::Join":
-        - ""
-        - - "aws lambda invoke --function-name "
-          - { Ref: LambdaFunction2 }
-          - " output.txt"
-
+      "Fn::Sub": |
+        aws lambda invoke --function-name ${LambdaFunction2} /tmp/${LambdaFunction2}-output.txt; cat /tmp/${LambdaFunction2}-output.txt
