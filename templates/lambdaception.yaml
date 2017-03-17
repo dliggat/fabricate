@@ -1,0 +1,257 @@
+AWSTemplateFormatVersion: "2010-09-09"
+
+Description: {{ metadata['description'] }}
+
+Metadata:
+  CommitHash: {{ metadata['commit_hash'] }}
+  CommitMessage: {{ metadata['commit_message'] }}
+
+Parameters:
+  ResourcePrefix:
+    Type: String
+    Description: A description to identify resources  (e.g. "my-perf-test")
+    MinLength: 2
+
+  Timeout:
+    Type: Number
+    Description: Timeout for the function in seconds
+
+  MemorySize:
+    Type: Number
+    Description: Memory for the function in MB
+
+
+Resources:
+  LambdaFunction:
+    Type: AWS::Lambda::Function
+    Metadata:
+      Comment:
+        "Fn::Sub":
+          "Function for ${ResourcePrefix}"
+    DependsOn: [ LambdaFunctionExecutionRole ]
+    Properties:
+      Code:
+        ZipFile:
+          "Fn::Sub": |
+            import json
+            import logging
+
+            logging.basicConfig()
+            logger = logging.getLogger(__name__)
+            logger.setLevel(logging.INFO)
+
+            def handler(event, context):
+                logger.info('Event: ' + json.dumps(event))
+                logger.info('Context:' + str(dir(context)))
+                return { 'message': 'Hello WORLD!' }
+
+      Role: { "Fn::GetAtt": [ LambdaFunctionExecutionRole, Arn ] }
+      Timeout: { Ref: Timeout }
+      Handler: index.handler
+      Runtime: python2.7
+      MemorySize: { Ref: MemorySize }
+
+  Policy:
+    Type: AWS::IAM::Policy
+    Properties:
+      Roles:
+        - { Ref: LambdaFunctionExecutionRole }
+      PolicyName: CommonPolicyForLambdaAndDevelopment
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Action:
+              - "logs:CreateLogGroup"
+              - "logs:CreateLogStream"
+              - "logs:PutLogEvents"
+            Resource: "arn:aws:logs:*:*:*"
+          - Effect: Allow
+            Action:
+              - "ec2:DescribeSecurityGroups"
+            Resource: "*"
+
+
+  # The IAM role that the lambda function will execute under.
+  LambdaFunctionExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: [ lambda.amazonaws.com ]
+            Action:
+              - sts:AssumeRole
+          - Effect: Allow
+            Principal:
+              AWS:
+                - "Fn::Join":
+                  - ""
+                  - - "arn:aws:iam::"
+                    - { Ref: "AWS::AccountId" }
+                    - ":"
+                    - "root"
+            Action:
+              - sts:AssumeRole
+      Path: /
+      # # Optional:
+      # ManagedPolicyArns:
+      #   - arn:aws:iam::aws:policy/AmazonEC2ReadOnlyAccess
+
+
+  LambdaFunction2:
+    Type: AWS::Lambda::Function
+    Metadata:
+      Comment:
+        "Fn::Sub":
+          "Function for ${ResourcePrefix}"
+    DependsOn: [ LambdaFunctionExecutionRole2 ]
+    Properties:
+      Code:
+        ZipFile:
+          "Fn::Sub": |
+            import boto3
+            import json
+            import logging
+
+            from botocore.exceptions import ClientError
+
+            logging.basicConfig()
+            logger = logging.getLogger(__name__)
+            logger.setLevel(logging.INFO)
+
+            client = boto3.client('lambda')
+
+
+            def handler(event, context):
+                function_name = '${LambdaFunction}'
+                try:
+                    result = client.invoke(FunctionName=function_name)
+                except ClientError as e:
+                    logger.error(e)
+                    return { 'error': e }
+                if result['StatusCode'] != 200:
+                    logger.error('Status Code error ' + json.dumps(result))
+                    return { 'error': result['StatusCode'] }
+                else:
+                    response = result['Payload'].read()
+                    return json.loads(response)
+
+
+      Role: { "Fn::GetAtt": [ LambdaFunctionExecutionRole2, Arn ] }
+      Timeout: { Ref: Timeout }
+      Handler: index.handler
+      Runtime: python2.7
+      MemorySize: { Ref: MemorySize }
+
+  Policy2:
+    Type: AWS::IAM::Policy
+    Properties:
+      Roles:
+        - { Ref: LambdaFunctionExecutionRole2 }
+      PolicyName: CommonPolicyForLambdaAndDevelopment2
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Action:
+              - "logs:CreateLogGroup"
+              - "logs:CreateLogStream"
+              - "logs:PutLogEvents"
+            Resource: "arn:aws:logs:*:*:*"
+          - Effect: Allow
+            Action:
+              - "ec2:DescribeSecurityGroups"
+            Resource: "*"
+          - Effect: Allow
+            Action:
+              - "lambda:InvokeFunction"
+            Resource:
+              "Fn::GetAtt": [ LambdaFunction, Arn ]
+
+
+  # The IAM role that the lambda function will execute under.
+  LambdaFunctionExecutionRole2:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: [ lambda.amazonaws.com ]
+            Action:
+              - sts:AssumeRole
+          - Effect: Allow
+            Principal:
+              AWS:
+                - "Fn::Join":
+                  - ""
+                  - - "arn:aws:iam::"
+                    - { Ref: "AWS::AccountId" }
+                    - ":"
+                    - "root"
+            Action:
+              - sts:AssumeRole
+      Path: /
+      # # Optional:
+      # ManagedPolicyArns:
+      #   - arn:aws:iam::aws:policy/AmazonEC2ReadOnlyAccess
+
+
+
+Outputs:
+  LambdaFunction:
+    Value: { Ref : LambdaFunction }
+  LambdaFunctionARN:
+    Value: { "Fn::GetAtt": [ LambdaFunction, Arn ] }
+  LambdaFunctionExecutionRole:
+    Value: { Ref : LambdaFunctionExecutionRole }
+  LambdaFunctionExecutionRoleARN:
+    Value: { "Fn::GetAtt": [ LambdaFunctionExecutionRole, Arn ] }
+  SigninUrl:
+    Value:
+      "Fn::Join":
+        - ""
+        - - "https://signin.aws.amazon.com/switchrole?account="
+          - { Ref: "AWS::AccountId" }
+          - "&roleName="
+          - { Ref : LambdaFunctionExecutionRole }
+          - "&displayName=assumed-role"
+
+  TestCommand:
+    Value:
+      "Fn::Join":
+        - ""
+        - - "aws lambda invoke --function-name "
+          - { Ref: LambdaFunction }
+          - " output.txt"
+
+  LambdaFunction2:
+    Value: { Ref : LambdaFunction2 }
+  LambdaFunctionARN2:
+    Value: { "Fn::GetAtt": [ LambdaFunction2, Arn ] }
+  LambdaFunctionExecutionRole2:
+    Value: { Ref : LambdaFunctionExecutionRole2 }
+  LambdaFunctionExecutionRoleARN2:
+    Value: { "Fn::GetAtt": [ LambdaFunctionExecutionRole2, Arn ] }
+  SigninUrl2:
+    Value:
+      "Fn::Join":
+        - ""
+        - - "https://signin.aws.amazon.com/switchrole?account="
+          - { Ref: "AWS::AccountId" }
+          - "&roleName="
+          - { Ref : LambdaFunctionExecutionRole2 }
+          - "&displayName=assumed-role"
+
+  TestCommand2:
+    Value:
+      "Fn::Join":
+        - ""
+        - - "aws lambda invoke --function-name "
+          - { Ref: LambdaFunction2 }
+          - " output.txt"
+

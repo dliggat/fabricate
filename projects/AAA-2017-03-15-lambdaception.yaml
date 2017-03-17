@@ -1,0 +1,6 @@
+template: lambdaception
+
+parameters:
+  ResourcePrefix: lambdaception
+  Timeout: "300"
+  MemorySize: "256"
