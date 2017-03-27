@@ -1,0 +1,4 @@
+template: idempotent_bucket_creator
+
+parameters:
+  ResourcePrefix: idempotent-bucket-creator

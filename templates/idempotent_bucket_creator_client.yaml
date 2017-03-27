@@ -1,0 +1,37 @@
+AWSTemplateFormatVersion: "2010-09-09"
+
+Description: {{ metadata['description'] }}
+
+Metadata:
+  CommitHash: {{ metadata['commit_hash'] }}
+  CommitMessage: {{ metadata['commit_message'] }}
+
+
+Resources:
+  IdempotentBucket1:
+    Type: Custom::IdempotentBucket
+    Properties:
+      ServiceToken: { "Fn::ImportValue": CustomResourceArn-IdempotentBucketCreator }
+      Region: { Ref: "AWS::Region" }
+      Name: dliggat-test
+
+  IdempotentBucket2:
+    Type: Custom::IdempotentBucket
+    Properties:
+      ServiceToken: { "Fn::ImportValue": CustomResourceArn-IdempotentBucketCreator }
+      Region: { Ref: "AWS::Region" }
+      Name: dliggat-test2
+
+
+
+Outputs:
+  IdempotentBucket1:
+    Value: { Ref: IdempotentBucket1 }
+  IdempotentBucketCreatedByCustomResource1:
+    Value:
+      "Fn::GetAtt": [IdempotentBucket1, CreatedByCustomResource]
+  IdempotentBucket2:
+    Value: { Ref: IdempotentBucket2 }
+  IdempotentBucketCreatedByCustomResource2:
+    Value:
+      "Fn::GetAtt": [IdempotentBucket2, CreatedByCustomResource]

@@ -1,0 +1,204 @@
+AWSTemplateFormatVersion: "2010-09-09"
+
+Description: {{ metadata['description'] }}
+
+Metadata:
+  CommitHash: {{ metadata['commit_hash'] }}
+  CommitMessage: {{ metadata['commit_message'] }}
+
+Parameters:
+  ResourcePrefix:
+    Type: String
+    Description: A description to identify resources  (e.g. "my-perf-test")
+    MinLength: 2
+
+Resources:
+  LambdaFunction:
+    Type: AWS::Lambda::Function
+    Metadata:
+      Comment:
+        "Fn::Sub":
+          "Function for ${ResourcePrefix}"
+    DependsOn: [ LambdaFunctionExecutionRole ]
+    Properties:
+      Code:
+        ZipFile:
+          "Fn::Sub": |
+            import boto3
+            import json
+            import logging
+            import traceback
+            from botocore.vendored import requests
+
+            logging.basicConfig()
+            logger = logging.getLogger(__name__)
+            logger.setLevel(logging.INFO)
+
+            def send_cfn_response(event,
+                                  context,
+                                  response_status,
+                                  response_data={},
+                                  physical_resource_id=None):
+
+                if physical_resource_id is None:
+                    physical_resource_id = context.log_stream_name
+                response_data = { str(k): str(v) for k,v in response_data.items() }
+                reason = ('See the details in CloudWatch Log Stream: %s from Log Group: %s' % (
+                    context.log_stream_name, context.log_group_name))
+                if (response_status == 'FAILED') and 'result' in response_data:
+                    reason = '%s %s' % (response_data['result'], reason)
+
+                body = {
+                    'Status': response_status,
+                    'Reason': reason,
+                    'PhysicalResourceId': physical_resource_id,
+                    'StackId': event['StackId'],
+                    'RequestId': event['RequestId'],
+                    'LogicalResourceId': event['LogicalResourceId'],
+                    'Data': response_data
+                }
+                response_body = json.dumps(body)
+                logger.debug('Response body: %s', response_body)
+                try:
+                    response = requests.put(event['ResponseURL'],
+                                            data=response_body)
+                    logger.debug('Status code: %s' % response.status_code)
+                except Exception as e:
+                    logger.error('send(..) failed executing https.request(..): %s' %
+                                 e.message)
+
+            class Status(object):
+                SUCCESS = 'SUCCESS'
+                FAILED = 'FAILED'
+
+            class Type(object):
+                CREATE = 'Create'
+                DELETE = 'Delete'
+                UPDATE = 'Update'
+
+            def update_resource(event, context):
+                return {'CreatedByCustomResource': 'unknown'}
+
+            def delete_resource(event, context):
+                return {'CreatedByCustomResource': 'unknown'}
+
+            def create_resource(event, context):
+                client = boto3.client('s3')
+                my_buckets = [ b['Name'] for b in client.list_buckets()['Buckets'] ]
+                bucket_name = event['ResourceProperties']['Name']
+                if bucket_name in my_buckets:
+                    created = 'false'
+                else:
+                    client.create_bucket(Bucket=bucket_name)
+                    created = 'true'
+                return {'CreatedByCustomResource': created}, bucket_name
+
+            def handler(event, context):
+                logger.info('Event: ' + json.dumps(event))
+                logger.info('Context: ' + str(dir(context)))
+                operation = event['RequestType']
+                physical_id = None
+                data = { }
+                try:
+                    if operation == Type.CREATE:
+                        data, physical_id = create_resource(event, context)
+                    elif operation == Type.DELETE:
+                        data = delete_resource(event, context)
+                    else:
+                        data = update_resource(event, context)
+                except Exception as e:
+                    logger.error('CloudFormation custom resource {0} failed. Exception: {1}'.format(operation, traceback.format_exc()))
+                    status = Status.FAILED
+                else:
+                    status = Status.SUCCESS
+                    logger.info('CloudFormation custom resource {0} succeeded. Result data {1}'.format(operation, json.dumps(data)))
+                send_cfn_response(event, context, status, data, physical_id)
+
+
+      Role: { "Fn::GetAtt": [ LambdaFunctionExecutionRole, Arn ] }
+      Timeout: "30"  # Seconds.
+      Handler: index.handler
+      Runtime: python2.7
+      MemorySize: "128"  # MB.
+
+  Policy:
+    Type: AWS::IAM::Policy
+    Properties:
+      Roles:
+        - { Ref: LambdaFunctionExecutionRole }
+      PolicyName: CommonPolicyForLambdaAndDevelopment
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Action:
+              - "logs:CreateLogGroup"
+              - "logs:CreateLogStream"
+              - "logs:PutLogEvents"
+            Resource: "arn:aws:logs:*:*:*"
+          - Effect: Allow
+            Action:
+              - "s3:CreateBucket"
+              - "s3:ListAllMyBuckets"
+            Resource: "*"
+
+
+  LambdaFunctionExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: [ lambda.amazonaws.com ]
+            Action:
+              - sts:AssumeRole
+          - Effect: Allow
+            Principal:
+              AWS:
+                - "Fn::Join":
+                  - ""
+                  - - "arn:aws:iam::"
+                    - { Ref: "AWS::AccountId" }
+                    - ":"
+                    - "root"
+            Action:
+              - sts:AssumeRole
+      Path: /
+      # # Optional:
+      # ManagedPolicyArns:
+      #   - arn:aws:iam::aws:policy/AmazonEC2ReadOnlyAccess
+
+  # IdempotentBucket:
+  #   Type: Custom::IdempotentBucket
+  #   Properties:
+  #     ServiceToken:
+  #       "Fn::GetAtt": [LambdaFunction, Arn]
+  #     Region: { Ref: "AWS::Region" }
+  #     Name: dliggat-not-yet-a-bucket
+
+Outputs:
+  # IdempotentBucketCreatedByCustomResource:
+  #   Value:
+  #     "Fn::GetAtt": [IdempotentBucket, CreatedByCustomResource]
+  # IdempotentBucket:
+  #   Value: { Ref: IdempotentBucket }
+  LambdaFunction:
+    Value: { Ref : LambdaFunction }
+  LambdaFunctionARN:
+    Value: { "Fn::GetAtt": [ LambdaFunction, Arn ] }
+    Export:
+      Name: CustomResourceArn-IdempotentBucketCreator
+  LambdaFunctionExecutionRole:
+    Value: { Ref : LambdaFunctionExecutionRole }
+  LambdaFunctionExecutionRoleARN:
+    Value: { "Fn::GetAtt": [ LambdaFunctionExecutionRole, Arn ] }
+  SigninUrl:
+    Value:
+      "Fn::Sub": |
+        https://signin.aws.amazon.com/switchrole?account=${AWS::AccountId}&roleName=${LambdaFunctionExecutionRole}&displayName=assumed-role
+  TestCommand:
+    Value:
+      "Fn::Sub": |
+        aws lambda invoke --function-name ${LambdaFunction} /tmp/${LambdaFunction}-output.txt; cat /tmp/${LambdaFunction}-output.txt
