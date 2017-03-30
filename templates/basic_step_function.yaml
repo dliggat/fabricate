@@ -29,17 +29,23 @@ Resources:
         "Fn::Sub":
           - |-
             {
-              "Comment": "A Hello World AWL example using an AWS Lambda Function",
-              "StartAt": "HelloWorld",
+              "Comment": "A Hello World state machine example that packages data in one state and sends it to the other to be uppercased",
+              "StartAt": "Packager",
               "States": {
-                "HelloWorld": {
+                "Packager": {
                   "Type": "Task",
-                  "Resource": "${lambdaArn}",
+                  "Resource": "${lambdaArn1}",
+                  "Next": "Uppercaser"
+                },
+                "Uppercaser": {
+                  "Type": "Task",
+                  "Resource": "${lambdaArn2}",
                   "End": true
                 }
               }
             }
-          - lambdaArn: { "Fn::GetAtt": [ LambdaFunction, Arn ] }
+          - lambdaArn1: { "Fn::GetAtt": [ LambdaFunction, Arn ] }
+            lambdaArn2: { "Fn::GetAtt": [ LambdaFunction2, Arn ] }
       RoleArn:
         "Fn::Sub":
           "arn:aws:iam::${AWS::AccountId}:role/service-role/StatesExecutionRole-${AWS::Region}"
@@ -66,7 +72,8 @@ Resources:
             def handler(event, context):
                 logger.info('Event: ' + json.dumps(event))
                 logger.info('Context: ' + str(dir(context)))
-                return { 'message': 'Hello WORLD!' }
+                message = event['message']
+                return { 'message': message }
 
       Role: { "Fn::GetAtt": [ LambdaFunctionExecutionRole, Arn ] }
       Timeout: { Ref: Timeout }
@@ -135,32 +142,18 @@ Resources:
       Code:
         ZipFile:
           "Fn::Sub": |
-            import boto3
             import json
             import logging
-
-            from botocore.exceptions import ClientError
 
             logging.basicConfig()
             logger = logging.getLogger(__name__)
             logger.setLevel(logging.INFO)
 
-            client = boto3.client('lambda')
-
-
             def handler(event, context):
-                function_name = '${LambdaFunction}'
-                try:
-                    result = client.invoke(FunctionName=function_name)
-                except ClientError as e:
-                    logger.error(e)
-                    return { 'error': e }
-                if result['StatusCode'] != 200:
-                    logger.error('Status Code error ' + json.dumps(result))
-                    return { 'error': result['StatusCode'] }
-                else:
-                    response = result['Payload'].read()
-                    return json.loads(response)
+                logger.info('Event: ' + json.dumps(event))
+                logger.info('Context: ' + str(dir(context)))
+                return { 'message': event['message'].upper() }
+
 
 
       Role: { "Fn::GetAtt": [ LambdaFunctionExecutionRole2, Arn ] }
@@ -188,11 +181,11 @@ Resources:
             Action:
               - "ec2:DescribeSecurityGroups"
             Resource: "*"
-          - Effect: Allow
-            Action:
-              - "lambda:InvokeFunction"
-            Resource:
-              "Fn::GetAtt": [ LambdaFunction, Arn ]
+          # - Effect: Allow
+          #   Action:
+          #     - "lambda:InvokeFunction"
+          #   Resource:
+          #     "Fn::GetAtt": [ LambdaFunction, Arn ]
 
 
   # The IAM role that the lambda function will execute under.
@@ -241,7 +234,7 @@ Outputs:
   TestCommand:
     Value:
       "Fn::Sub": |
-        aws lambda invoke --function-name ${LambdaFunction} /tmp/${LambdaFunction}-output.txt; cat /tmp/${LambdaFunction}-output.txt
+        aws lambda invoke --function-name ${LambdaFunction} /tmp/${LambdaFunction}-output.txt --payload '{"message": "foo"}'; cat /tmp/${LambdaFunction}-output.txt
 
   LambdaFunction2:
     Value: { Ref : LambdaFunction2 }
@@ -258,4 +251,8 @@ Outputs:
   TestCommand2:
     Value:
       "Fn::Sub": |
-        aws lambda invoke --function-name ${LambdaFunction2} /tmp/${LambdaFunction2}-output.txt; cat /tmp/${LambdaFunction2}-output.txt
+        aws lambda invoke --function-name ${LambdaFunction2} /tmp/${LambdaFunction2}-output.txt --payload '{"message": "foo"}'; cat /tmp/${LambdaFunction2}-output.txt
+  StepCommand:
+    Value:
+      "Fn::Sub": |
+        aws stepfunctions start-execution --state-machine-arn ${MyStateMachine} --name "`hostname`-`date +%Y%m%d_%H%M%S%Z`" --input '{"message": "whatever"}'
