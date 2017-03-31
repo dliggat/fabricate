@@ -29,10 +29,10 @@ Resources:
         "Fn::Sub":
           - |-
             {
-              "Comment": "A Hello World state machine example that packages data in one state and sends it to the other to be uppercased",
-              "StartAt": "Packager",
+              "Comment": "A Hello World state machine example that builds a greeting in one state and sends it to the other to be uppercased",
+              "StartAt": "Greeter",
               "States": {
-                "Packager": {
+                "Greeter": {
                   "Type": "Task",
                   "Resource": "${lambdaArn1}",
                   "Next": "Uppercaser"
@@ -72,7 +72,7 @@ Resources:
             def handler(event, context):
                 logger.info('Event: ' + json.dumps(event))
                 logger.info('Context: ' + str(dir(context)))
-                message = event['message']
+                message = 'Hello, ' + event['name'] + '!'
                 return { 'message': message }
 
       Role: { "Fn::GetAtt": [ LambdaFunctionExecutionRole, Arn ] }
@@ -231,10 +231,10 @@ Outputs:
     Value:
       "Fn::Sub": |
         https://signin.aws.amazon.com/switchrole?account=${AWS::AccountId}&roleName=${LambdaFunctionExecutionRole}&displayName=assumed-role
-  TestCommand:
+  LambdaCommand:
     Value:
       "Fn::Sub": |
-        aws lambda invoke --function-name ${LambdaFunction} /tmp/${LambdaFunction}-output.txt --payload '{"message": "foo"}'; cat /tmp/${LambdaFunction}-output.txt
+        aws lambda invoke --function-name ${LambdaFunction} /tmp/${LambdaFunction}-output.txt --payload '{"name": "alice"}'; cat /tmp/${LambdaFunction}-output.txt
 
   LambdaFunction2:
     Value: { Ref : LambdaFunction2 }
@@ -248,11 +248,11 @@ Outputs:
     Value:
       "Fn::Sub": |
         https://signin.aws.amazon.com/switchrole?account=${AWS::AccountId}&roleName=${LambdaFunctionExecutionRole2}&displayName=assumed-role
-  TestCommand2:
+  LambdaCommand2:
     Value:
       "Fn::Sub": |
-        aws lambda invoke --function-name ${LambdaFunction2} /tmp/${LambdaFunction2}-output.txt --payload '{"message": "foo"}'; cat /tmp/${LambdaFunction2}-output.txt
+        aws lambda invoke --function-name ${LambdaFunction2} /tmp/${LambdaFunction2}-output.txt --payload '{"message": "Hello, bob!"}'; cat /tmp/${LambdaFunction2}-output.txt
   StepCommand:
     Value:
       "Fn::Sub": |
-        aws stepfunctions start-execution --state-machine-arn ${MyStateMachine} --name "`hostname`-`date +%Y%m%d_%H%M%S%Z`" --input '{"message": "whatever"}'
+        aws stepfunctions start-execution --state-machine-arn ${MyStateMachine} --name "`hostname`-`date +%Y%m%d_%H%M%S%Z`" --input '{"name": "joe"}'
