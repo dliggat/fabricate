@@ -1,0 +1,161 @@
+AWSTemplateFormatVersion: "2010-09-09"
+
+Description: {{ metadata['description'] }}
+
+Metadata:
+  CommitHash: {{ metadata['commit_hash'] }}
+  CommitMessage: {{ metadata['commit_message'] }}
+
+Parameters:
+  ClusterName:
+    Type: String
+
+  ResourcePrefix:
+    Type: String
+
+  VpcExportIdentifier:
+    Type: String
+
+  SubnetAZ0ExportIdentifier:
+    Type: String
+
+  SubnetAZ1ExportIdentifier:
+    Type: String
+
+  KeypairName:
+    Type: AWS::EC2::KeyPair::KeyName
+
+  AmiId:
+    Type: AWS::EC2::Image::Id
+
+  InstanceType:
+    Type: String
+    Description: The size of the instance
+
+
+Resources:
+
+  Cluster:
+    Type: "AWS::ECS::Cluster"
+    Properties:
+      ClusterName: { Ref: ClusterName }
+  IamRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: 'PermitAssumeRoleEc2'
+            Action:
+              - sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service:
+                - ec2.amazonaws.com
+      Path: /
+      Policies:
+        - PolicyName: ECSStuff
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  # - "ecs:CreateCluster"
+                  - "ecs:DeregisterContainerInstance"
+                  - "ecs:DiscoverPollEndpoint"
+                  - "ecs:Poll"
+                  - "ecs:RegisterContainerInstance"
+                  - "ecs:StartTelemetrySession"
+                  - "ecs:Submit*"
+                  - "ecr:GetAuthorizationToken"
+                  - "ecr:BatchCheckLayerAvailability"
+                  - "ecr:GetDownloadUrlForLayer"
+                  - "ecr:BatchGetImage"
+                  - "logs:CreateLogStream"
+                  - "logs:PutLogEvents"
+                Resource: "*"
+
+  IamProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Path: /
+      Roles:
+        - Ref: IamRole
+
+  SecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      VpcId:
+        "Fn::ImportValue": { Ref: VpcExportIdentifier }
+      GroupDescription:
+        "Fn::Join":
+          - "-"
+          - - { Ref: ResourcePrefix }
+            - "sg"
+      Tags:
+        - Key: Name
+          Value:
+            "Fn::Join":
+              - "-"
+              - - { Ref: ResourcePrefix }
+                - "sg"
+
+  SecurityGroupSshIngress:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: { Ref: SecurityGroup }
+      CidrIp: "0.0.0.0/0"
+      IpProtocol: tcp
+      FromPort: 22
+      ToPort: 22
+
+  LaunchConfig:
+    Type: AWS::AutoScaling::LaunchConfiguration
+    Properties:
+      ImageId: { Ref: AmiId }
+      KeyName: { Ref: KeypairName }
+      IamInstanceProfile: { Ref: IamProfile }
+      InstanceType: { Ref: InstanceType }
+      SecurityGroups:
+        - { Ref: SecurityGroup }
+      UserData:
+        "Fn::Base64":
+          "Fn::Sub": |
+            #!/bin/bash
+            yum update -y
+            yum install -y git sl gcc mysql postgresql95-devel telnet
+            echo ECS_CLUSTER=${ClusterName} >> /etc/ecs/ecs.config
+
+  Asg:
+    Type: AWS::AutoScaling::AutoScalingGroup
+    Properties:
+      Tags:
+        - Key: Name
+          Value:
+            "Fn::Join":
+              - "-"
+              - - { Ref: ResourcePrefix }
+                - "asg"
+                - "ecs"
+                - "instance"
+          PropagateAtLaunch: true
+
+      MinSize: 2
+      MaxSize: 2
+      LaunchConfigurationName: { Ref: LaunchConfig }
+      VPCZoneIdentifier:
+        - "Fn::ImportValue": { Ref: SubnetAZ0ExportIdentifier }
+        - "Fn::ImportValue": { Ref: SubnetAZ1ExportIdentifier }
+
+Outputs:
+  SgIdExport:
+    Value: { Ref: SecurityGroup }
+    Export:
+      Name:
+        "Fn::Join":
+          - "-"
+          - - { Ref: ResourcePrefix }
+            - "SgId"
+
+  Cluster:
+    Value: { Ref: Cluster }

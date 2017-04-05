@@ -1,0 +1,11 @@
+template: ecs
+
+parameters:
+  ClusterName: dliggat-ecs
+  ResourcePrefix: dliggat-ecs
+  VpcExportIdentifier: dliggat-vpc-VpcId
+  SubnetAZ0ExportIdentifier: dliggat-vpc-PublicSubnetAZ0
+  SubnetAZ1ExportIdentifier: dliggat-vpc-PublicSubnetAZ1
+  KeypairName: dliggat-tam
+  AmiId: ami-2d1bce4d
+  InstanceType: m4.large
