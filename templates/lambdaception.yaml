@@ -43,7 +43,7 @@ Resources:
             def handler(event, context):
                 logger.info('Event: ' + json.dumps(event))
                 logger.info('Context: ' + str(dir(context)))
-                return { 'message': 'Hello WORLD!' }
+                return { 'message': 'Hello World!' }
 
       Role: { "Fn::GetAtt": [ LambdaFunctionExecutionRole, Arn ] }
       Timeout: { Ref: Timeout }
