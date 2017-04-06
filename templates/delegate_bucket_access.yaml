@@ -1,0 +1,67 @@
+AWSTemplateFormatVersion: "2010-09-09"
+
+Parameters:
+  TrustedAwsAccountId:
+    Type: String
+    Description: The account ID to trust
+
+  Bucket:
+    Type: String
+    Description: Name of bucket to delegate access to; e.g. for s3://billing, use billing
+
+
+Resources:
+
+  CrossAccountRole:
+    Type: AWS::IAM::Role
+    Properties:
+      Policies:
+        - PolicyName: permit-bucket-access
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Action:
+                  - "s3:GetBucketLocation"
+                Effect: Allow
+                Resource: "arn:aws:s3:::*"
+              - Action:
+                  - "s3:ListBucket"
+                  - "s3:ListObjects"
+                Effect: Allow
+                Resource:
+                  "Fn::Join":
+                    - ""
+                    - - "arn:aws:s3:::"
+                      - { Ref: Bucket }
+              - Action:
+                  - "s3:GetObject"
+                  - "s3:GetObjectAcl"
+                Effect: Allow
+                Resource:
+                  "Fn::Join":
+                    - ""
+                    - - "arn:aws:s3:::"
+                      - { Ref: Bucket }
+                      - "/*"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Action: "sts:AssumeRole"
+            Principal:
+              AWS: { Ref: TrustedAwsAccountId }
+
+
+Outputs:
+
+  RoleArn:
+    Value:
+      "Fn::GetAtt": [CrossAccountRole, Arn]
+  SigninUrl:
+    Value:
+      "Fn::Join":
+        - ""
+        - - "https://signin.aws.amazon.com/switchrole?account="
+          - { Ref: "AWS::AccountId" }
+          - "&roleName="
+          - { Ref: CrossAccountRole }

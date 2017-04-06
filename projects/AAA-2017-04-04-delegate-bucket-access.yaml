@@ -1,0 +1,5 @@
+template: delegate_bucket_access
+
+parameters:
+  TrustedAwsAccountId: "579412327719"
+  Bucket: foobarbaz-dliggat
