@@ -1,0 +1,6 @@
+template: s3_to_glacier_archive
+
+parameters:
+  BucketName: dliggat-personal-archive-storage
+  NotificationEmail: dave@liggat.org
+  TransitionInDays: "3"
