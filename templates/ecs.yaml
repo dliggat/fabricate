@@ -39,7 +39,7 @@ Resources:
     Type: "AWS::ECS::Cluster"
     Properties:
       ClusterName: { Ref: ClusterName }
-  IamRole:
+  EcsInstanceRole:
     Type: AWS::IAM::Role
     Properties:
       AssumeRolePolicyDocument:
@@ -53,26 +53,16 @@ Resources:
               Service:
                 - ec2.amazonaws.com
       Path: /
+      ManagedPolicyArns:
+        - "arn:aws:iam::aws:policy/service-role/AmazonEC2ContainerServiceforEC2Role"
       Policies:
-        - PolicyName: ECSStuff
+        - PolicyName: OtherPoliciesGoHere
           PolicyDocument:
             Version: "2012-10-17"
             Statement:
               - Effect: Allow
                 Action:
-                  # - "ecs:CreateCluster"
-                  - "ecs:DeregisterContainerInstance"
-                  - "ecs:DiscoverPollEndpoint"
-                  - "ecs:Poll"
-                  - "ecs:RegisterContainerInstance"
-                  - "ecs:StartTelemetrySession"
-                  - "ecs:Submit*"
-                  - "ecr:GetAuthorizationToken"
-                  - "ecr:BatchCheckLayerAvailability"
-                  - "ecr:GetDownloadUrlForLayer"
-                  - "ecr:BatchGetImage"
-                  - "logs:CreateLogStream"
-                  - "logs:PutLogEvents"
+                  - "ec2:DescribeSecurityGroups"
                 Resource: "*"
 
   IamProfile:
@@ -80,7 +70,7 @@ Resources:
     Properties:
       Path: /
       Roles:
-        - Ref: IamRole
+        - Ref: EcsInstanceRole
 
   SecurityGroup:
     Type: AWS::EC2::SecurityGroup
