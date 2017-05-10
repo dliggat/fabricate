@@ -10,3 +10,6 @@ parameters:
   KeypairName: dliggat-tam
   AmiId: ami-1e299d7e
   InstanceType: t2.medium
+  LogsBucket: dliggat-load-balancer-logs
+  LogsPrefix: elb-demo
+  LoggingEnabled: "true"

@@ -35,6 +35,15 @@ Parameters:
     Type: String
     Description: The size of the instance
 
+  LogsBucket:
+    Type: String
+
+  LogsPrefix:
+    Type: String
+
+  LoggingEnabled:
+    Type: String
+
 
 Resources:
   IamRole:
@@ -163,6 +172,11 @@ Resources:
     Properties:
       # AppCookieStickinessPolicy:
       #   - AppCookieStickinessPolicy
+      AccessLoggingPolicy:
+        EmitInterval: 5
+        Enabled: { Ref: LoggingEnabled }
+        S3BucketName: { Ref: LogsBucket }
+        S3BucketPrefix: { Ref: LogsPrefix }
       ConnectionDrainingPolicy:
         Enabled: "True"
         Timeout: 45

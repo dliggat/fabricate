@@ -6,7 +6,7 @@ parameters:
   SubnetAZ0ExportIdentifier: dliggat-vpc-PrivateSubnetAZ0
   SubnetAZ1ExportIdentifier: dliggat-vpc-PrivateSubnetAZ1
   SubnetAZ2ExportIdentifier: dliggat-vpc-PrivateSubnetAZ2
-  DBIngressSecurityGroupExportIdentifier: tam-demo-amazon-linux-SgId
+  # DBIngressSecurityGroupExportIdentifier: tam-demo-amazon-linux-SgId
   DbInstanceClass: db.r3.large
   DatabaseUsername: foobarbaz
   DatabasePassword: foobarbaz

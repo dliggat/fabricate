@@ -1,0 +1,4 @@
+template: elb_logs_bucket
+
+parameters:
+  BucketName: dliggat-load-balancer-logs
