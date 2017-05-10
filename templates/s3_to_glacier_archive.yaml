@@ -1,0 +1,73 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: {{ metadata['description'] }}
+
+Metadata:
+  CommitHash: {{ metadata['commit_hash'] }}
+  CommitMessage: {{ metadata['commit_message'] }}
+
+Parameters:
+  BucketName:
+    Description: S3 bucket name
+    Type: String
+  NotificationEmail:
+    Description: Email to use for S3 deletion notifications
+    Type: String
+  TransitionInDays:
+    Description: How long to wait before glacier transition
+    Type: String
+
+Resources:
+
+  SNSTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      DisplayName:
+        Fn::Join:
+        - ''
+        - - Ref: BucketName
+          - "-deletions"
+      Subscription:
+      - Protocol: email
+        Endpoint:
+          Ref: NotificationEmail
+
+  SNSTopicPolicy:
+    Type: AWS::SNS::TopicPolicy
+    Properties:
+      PolicyDocument:
+        Id: S3BucketPolicy
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service: s3.amazonaws.com
+          Action:
+          - SNS:Publish
+          Resource: "*"
+          Condition:
+            ArnLike:
+              aws:SourceArn:
+                Fn::Join:
+                - ''
+                - - 'arn:aws:s3:*:*:'
+                  - Ref: BucketName
+      Topics:
+      - Ref: SNSTopic
+
+  S3Bucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName:
+        Ref: BucketName
+      LifecycleConfiguration:
+        Rules:
+        - Id: GlacierArchive
+          Status: Enabled
+          Transitions:
+          - StorageClass: GLACIER
+            TransitionInDays: { Ref: TransitionInDays }
+      NotificationConfiguration:
+        TopicConfigurations:
+        - Event: s3:ObjectRemoved:Delete
+          Topic:
+            Ref: SNSTopic
