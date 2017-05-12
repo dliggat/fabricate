@@ -1,0 +1,194 @@
+AWSTemplateFormatVersion: "2010-09-09"
+
+Description: {{ metadata['description'] }}
+
+Metadata:
+  CommitHash: {{ metadata['commit_hash'] }}
+  CommitMessage: {{ metadata['commit_message'] }}
+
+Parameters:
+  ResourcePrefix:
+    Type: String
+    Description: A description to identify resources  (e.g. "my-perf-test")
+    MinLength: 2
+
+  ScheduleExpression:
+    Type: String
+    Default: ""
+    Description: How often to invoke the function (e.g. 'rate(24 hours)'), or empty string to skip creating a AWS::Events::Rule
+
+  Timeout:
+    Type: Number
+    Description: Timeout for the function in seconds
+
+  QueueCount:
+    Type: Number
+    Description: Number of items to put into the queue
+
+  MemorySize:
+    Type: Number
+    Description: Memory for the function in MB
+
+Conditions:
+  HasSchedule:
+    "Fn::Not":
+      - "Fn::Equals":
+          - { Ref: ScheduleExpression }
+          - ""
+
+Resources:
+  LambdaFunction:
+    Type: AWS::Lambda::Function
+    Metadata:
+      Comment:
+        "Fn::Sub":
+          "Function for ${ResourcePrefix}"
+    DependsOn: [ LambdaFunctionExecutionRole ]
+    Properties:
+      Code:
+        ZipFile:
+          "Fn::Sub": |
+            'use strict';
+            console.log('Loading function');
+            var AWS = require('aws-sdk');
+            var sqs = new AWS.SQS({apiVersion: '2012-11-05'});
+
+            exports.handler = (event, context, callback) => {
+              let queue_url = '${Queue}';
+
+              for (let i = 0; i < ${QueueCount}; i++) {
+                let date = new Date();
+                let params = {
+                  MessageAttributes: {
+                    'MyNumericId': {
+                      DataType: 'Number',
+                      StringValue: '' + i
+                     }
+                   },
+                   MessageBody: 'Message: ' + date.toISOString(),
+                   QueueUrl: queue_url
+                };
+                sqs.sendMessage(params, (err, data) => {
+                  if (err) {
+                    console.log('Error', err);
+                  } else {
+                    console.log('Success', data.MessageId);
+                  }
+                });
+              }
+              callback(null, {result: queue_url});
+            };
+
+      Role: { "Fn::GetAtt": [ LambdaFunctionExecutionRole, Arn ] }
+      Timeout: { Ref: Timeout }
+      Handler: index.handler
+      Runtime: nodejs6.10
+      MemorySize: { Ref: MemorySize }
+
+  Queue:
+    Type: "AWS::SQS::Queue"
+    Properties:
+      MessageRetentionPeriod: 1209600  # 14 days (maximum)
+      VisibilityTimeout: 3600
+
+  Policy:
+    Type: AWS::IAM::Policy
+    Properties:
+      Roles:
+        - { Ref: LambdaFunctionExecutionRole }
+      PolicyName: CommonPolicyForLambdaAndDevelopment
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Action:
+              - "logs:CreateLogGroup"
+              - "logs:CreateLogStream"
+              - "logs:PutLogEvents"
+            Resource: "arn:aws:logs:*:*:*"
+          - Effect: Allow
+            Action:
+              - "sqs:SendMessage"
+            Resource: { "Fn::GetAtt": [ Queue, Arn ] }
+
+
+  # The IAM role that the lambda function will execute under.
+  LambdaFunctionExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: [ lambda.amazonaws.com ]
+            Action:
+              - sts:AssumeRole
+          - Effect: Allow
+            Principal:
+              AWS:
+                - "Fn::Join":
+                  - ""
+                  - - "arn:aws:iam::"
+                    - { Ref: "AWS::AccountId" }
+                    - ":"
+                    - "root"
+            Action:
+              - sts:AssumeRole
+      Path: /
+      # # Optional:
+      # ManagedPolicyArns:
+      #   - arn:aws:iam::aws:policy/AmazonEC2ReadOnlyAccess
+
+
+  # Permits the events service to invoke the service.
+  LambdaPermission:
+    Type: AWS::Lambda::Permission
+    Condition: HasSchedule
+    Properties:
+      Action: lambda:InvokeFunction
+      SourceArn:
+        "Fn::GetAtt": [ ScheduledRule, Arn ]
+      FunctionName: { "Fn::GetAtt": [ LambdaFunction, Arn ] }
+      Principal: events.amazonaws.com
+
+
+  # The cron rule for the execution.
+  ScheduledRule:
+    Type: AWS::Events::Rule
+    Condition: HasSchedule
+    Properties:
+      Description:
+        "Fn::Sub":
+          "Scheduled rule for ${ResourcePrefix}"
+      ScheduleExpression: { Ref : ScheduleExpression }
+      State: ENABLED
+      Targets:
+        - Arn: { "Fn::GetAtt": [ LambdaFunction, Arn ] }
+          Id: ScheduledRule
+
+Outputs:
+  QueueUrl:
+    Value: { Ref: Queue }
+    Export:
+      Name:
+        "Fn::Join":
+          - "-"
+          - - { Ref: ResourcePrefix }
+            - queue
+  LambdaFunction:
+    Value: { Ref : LambdaFunction }
+  LambdaFunctionARN:
+    Value: { "Fn::GetAtt": [ LambdaFunction, Arn ] }
+  LambdaFunctionExecutionRole:
+    Value: { Ref : LambdaFunctionExecutionRole }
+  LambdaFunctionExecutionRoleARN:
+    Value: { "Fn::GetAtt": [ LambdaFunctionExecutionRole, Arn ] }
+  SigninUrl:
+    Value:
+      "Fn::Sub": |
+        https://signin.aws.amazon.com/switchrole?account=${AWS::AccountId}&roleName=${LambdaFunctionExecutionRole}&displayName=assumed-role
+  TestCommand:
+    Value:
+      "Fn::Sub": |
+        aws lambda invoke --function-name ${LambdaFunction} /tmp/${LambdaFunction}-output.txt; cat /tmp/${LambdaFunction}-output.txt
