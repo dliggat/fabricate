@@ -21,9 +21,8 @@ Parameters:
     Type: Number
     Description: Timeout for the function in seconds
 
-  QueueCount:
+  AttemptCount:
     Type: Number
-    Description: Number of items to put into the queue
 
   MemorySize:
     Type: Number
@@ -47,49 +46,64 @@ Resources:
     Properties:
       Code:
         ZipFile:
-          "Fn::Sub": |
-            'use strict';
-            console.log('Loading function');
-            var AWS = require('aws-sdk');
-            var sqs = new AWS.SQS({apiVersion: '2012-11-05'});
+          "Fn::Sub":
+            - |-
+              'use strict';
+              console.log('Loading function');
+              var AWS = require('aws-sdk');
+              var sqs = new AWS.SQS({apiVersion: '2012-11-05'});
 
-            exports.handler = (event, context, callback) => {
-              let queue_url = '${Queue}';
+              exports.handler = (event, context, callback) => {
+                let queue_url = '${queue_url}';
+                var message = '';
 
-              for (let i = 0; i < ${QueueCount}; i++) {
-                let date = new Date();
-                let params = {
-                  MessageAttributes: {
-                    'MyNumericId': {
-                      DataType: 'Number',
-                      StringValue: '' + i
-                     }
-                   },
-                   MessageBody: 'Message: ' + date.toISOString(),
-                   QueueUrl: queue_url
-                };
-                sqs.sendMessage(params, (err, data) => {
-                  if (err) {
-                    console.log('Error', err);
-                  } else {
-                    console.log('Success', data.MessageId);
-                  }
-                });
-              }
-              callback(null, {result: queue_url});
-            };
+                for (let i = 0; i < ${AttemptCount}; i++) {
+                  console.log('Attempt: ' + i);
+                  let params = {
+                    MaxNumberOfMessages: 1,
+                    MessageAttributeNames: [
+                      'All'
+                    ],
+                    WaitTimeSeconds: 0,
+                    QueueUrl: queue_url
+                  };
+                  sqs.receiveMessage(params, (err, data) => {
+                    if (err) {
+                      message = 'Receive error' + err;
+                      console.log(message);
+                    } else {
+
+                      if (data.Messages) {
+                        let deleteParams = {
+                          QueueUrl: queue_url,
+                          ReceiptHandle: data.Messages[0].ReceiptHandle
+                        };
+                        console.log('Received message ', data.Messages[0]);
+                        sqs.deleteMessage(deleteParams, (err, data) => {
+                          if (err) {
+                            message = 'Delete Error' + err;
+                            console.log(message);
+                          } else {
+                            message = 'Message Deleted' + data.Messages[0];
+                            console.log(message);
+                          }
+                        });
+                      } else {
+                        message = 'Queue empty';
+                        console.log(message);
+                      }
+                    }
+                  });
+                }
+                callback(null, {result: message});
+              };
+            - queue_url: { "Fn::ImportValue": lambda-load-sqs-queue-url }
 
       Role: { "Fn::GetAtt": [ LambdaFunctionExecutionRole, Arn ] }
       Timeout: { Ref: Timeout }
       Handler: index.handler
       Runtime: nodejs6.10
       MemorySize: { Ref: MemorySize }
-
-  Queue:
-    Type: "AWS::SQS::Queue"
-    Properties:
-      MessageRetentionPeriod: 1209600  # 14 days (maximum)
-      VisibilityTimeout: 3600
 
   Policy:
     Type: AWS::IAM::Policy
@@ -108,8 +122,12 @@ Resources:
             Resource: "arn:aws:logs:*:*:*"
           - Effect: Allow
             Action:
-              - "sqs:SendMessage"
-            Resource: { "Fn::GetAtt": [ Queue, Arn ] }
+              - "sqs:ChangeMessageVisibility"
+              - "sqs:ChangeMessageVisibilityBatch"
+              - "sqs:DeleteMessage"
+              - "sqs:DeleteMessageBatch"
+              - "sqs:ReceiveMessage"
+            Resource: { "Fn::ImportValue": lambda-load-sqs-queue-arn }
 
 
   # The IAM role that the lambda function will execute under.
@@ -168,24 +186,6 @@ Resources:
           Id: ScheduledRule
 
 Outputs:
-  QueueUrl:
-    Value: { Ref: Queue }
-    Export:
-      Name:
-        "Fn::Join":
-          - "-"
-          - - { Ref: ResourcePrefix }
-            - queue
-            - url
-  QueueArn:
-    Value: { "Fn::GetAtt": [ Queue, Arn ] }
-    Export:
-      Name:
-        "Fn::Join":
-          - "-"
-          - - { Ref: ResourcePrefix }
-            - queue
-            - arn
   LambdaFunction:
     Value: { Ref : LambdaFunction }
   LambdaFunctionARN:
