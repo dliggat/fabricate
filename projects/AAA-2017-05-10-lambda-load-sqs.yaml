@@ -3,6 +3,6 @@ template: lambda_load_sqs
 parameters:
   ResourcePrefix: lambda-load-sqs
   ScheduleExpression: ""
-  Timeout: "10"
+  Timeout: "120"
   MemorySize: "256"
-  QueueCount: "3"
+  QueueCount: "10000"

@@ -2,7 +2,6 @@ template: lambda_consume_sqs
 
 parameters:
   ResourcePrefix: lambda-load-sqs
-  ScheduleExpression: ""
-  Timeout: "10"
+  ScheduleExpression: "rate(1 minute)"
+  Timeout: "3"
   MemorySize: "256"
-  AttemptCount: "1"

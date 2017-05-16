@@ -202,3 +202,7 @@ Outputs:
     Value:
       "Fn::Sub": |
         aws lambda invoke --function-name ${LambdaFunction} /tmp/${LambdaFunction}-output.txt; cat /tmp/${LambdaFunction}-output.txt
+  GetQueueAttributesCommand:
+    Value:
+      "Fn::Sub": |
+        aws sqs get-queue-attributes --queue-url ${Queue} --attribute-names All

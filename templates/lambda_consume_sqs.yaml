@@ -21,9 +21,6 @@ Parameters:
     Type: Number
     Description: Timeout for the function in seconds
 
-  AttemptCount:
-    Type: Number
-
   MemorySize:
     Type: Number
     Description: Memory for the function in MB
@@ -57,45 +54,45 @@ Resources:
                 let queue_url = '${queue_url}';
                 var message = '';
 
-                for (let i = 0; i < ${AttemptCount}; i++) {
-                  console.log('Attempt: ' + i);
-                  let params = {
-                    MaxNumberOfMessages: 1,
-                    MessageAttributeNames: [
-                      'All'
-                    ],
-                    WaitTimeSeconds: 0,
-                    QueueUrl: queue_url
-                  };
-                  sqs.receiveMessage(params, (err, data) => {
-                    if (err) {
-                      message = 'Receive error' + err;
-                      console.log(message);
-                    } else {
+                let params = {
+                  MaxNumberOfMessages: 1,
+                  MessageAttributeNames: [
+                    'All'
+                  ],
+                  WaitTimeSeconds: 1,
+                  QueueUrl: queue_url
+                };
+                sqs.receiveMessage(params, (err, data) => {
 
-                      if (data.Messages) {
-                        let deleteParams = {
-                          QueueUrl: queue_url,
-                          ReceiptHandle: data.Messages[0].ReceiptHandle
-                        };
-                        console.log('Received message ', data.Messages[0]);
-                        sqs.deleteMessage(deleteParams, (err, data) => {
-                          if (err) {
-                            message = 'Delete Error' + err;
-                            console.log(message);
-                          } else {
-                            message = 'Message Deleted' + data.Messages[0];
-                            console.log(message);
-                          }
-                        });
-                      } else {
-                        message = 'Queue empty';
-                        console.log(message);
-                      }
+                  if (err) {
+                    message = 'Receive error' + err;
+                    console.log(message);
+                    callback(err, null);
+                  } else {
+
+                    if (data.Messages) {
+                      let deleteParams = {
+                        QueueUrl: queue_url,
+                        ReceiptHandle: data.Messages[0].ReceiptHandle
+                      };
+                      let deleted = data.Messages[0];
+                      console.log('Received message ', deleted);
+                      sqs.deleteMessage(deleteParams, (err, data) => {
+                        if (err) {
+                          message = 'Delete Error' + err;
+                          console.log(message);
+                        } else {
+                          message = 'Message Deleted' + deleted;
+                          console.log(message);
+                        }
+                      });
+                    } else {
+                      message = 'Queue empty';
+                      console.log(message);
+                      callback(null, {result: message});
                     }
-                  });
-                }
-                callback(null, {result: message});
+                  }
+                });
               };
             - queue_url: { "Fn::ImportValue": lambda-load-sqs-queue-url }
 
