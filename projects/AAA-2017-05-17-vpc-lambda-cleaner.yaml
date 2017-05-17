@@ -1,0 +1,4 @@
+template: vpc_lambda_cleaner
+
+parameters:
+  ResourcePrefix: vpc-lambda-cleaner

@@ -77,21 +77,13 @@ Resources:
                 UPDATE = 'Update'
 
             def update_resource(event, context):
-                return {'CreatedByCustomResource': 'unknown'}
+                return {'CreatedByCustomResource': 'false'}
 
             def delete_resource(event, context):
-                return {'CreatedByCustomResource': 'unknown'}
+                return {'CreatedByCustomResource': 'false'}
 
             def create_resource(event, context):
-                client = boto3.client('s3')
-                my_buckets = [ b['Name'] for b in client.list_buckets()['Buckets'] ]
-                bucket_name = event['ResourceProperties']['Name']
-                if bucket_name in my_buckets:
-                    created = 'false'
-                else:
-                    client.create_bucket(Bucket=bucket_name)
-                    created = 'true'
-                return {'CreatedByCustomResource': created}, bucket_name
+                return {'CreatedByCustomResource': 'false'}, 'no-op'
 
             def handler(event, context):
                 logger.info('Event: ' + json.dumps(event))
@@ -138,8 +130,10 @@ Resources:
             Resource: "arn:aws:logs:*:*:*"
           - Effect: Allow
             Action:
-              - "s3:CreateBucket"
-              - "s3:ListAllMyBuckets"
+              - "ec2:DescribeSecurityGroups"
+              - "ec2:DescribeNetworkInterfaces"
+              - "ec2:CreateNetworkInterface"
+              - "ec2:DeleteNetworkInterface"
             Resource: "*"
 
 
@@ -170,26 +164,14 @@ Resources:
       # ManagedPolicyArns:
       #   - arn:aws:iam::aws:policy/AmazonEC2ReadOnlyAccess
 
-  # IdempotentBucket:
-  #   Type: Custom::IdempotentBucket
-  #   Properties:
-  #     ServiceToken:
-  #       "Fn::GetAtt": [CustomResourceLambdaFunction, Arn]
-  #     Region: { Ref: "AWS::Region" }
-  #     Name: dliggat-not-yet-a-bucket
 
 Outputs:
-  # IdempotentBucketCreatedByCustomResource:
-  #   Value:
-  #     "Fn::GetAtt": [IdempotentBucket, CreatedByCustomResource]
-  # IdempotentBucket:
-  #   Value: { Ref: IdempotentBucket }
   CustomResourceLambdaFunction:
     Value: { Ref : CustomResourceLambdaFunction }
   CustomResourceLambdaFunctionARN:
     Value: { "Fn::GetAtt": [ CustomResourceLambdaFunction, Arn ] }
     Export:
-      Name: CustomResourceArn-IdempotentBucketCreator
+      Name: CustomResourceArn-VpcLambdaCleaner
   CustomResourceLambdaFunctionExecutionRole:
     Value: { Ref : CustomResourceLambdaFunctionExecutionRole }
   CustomResourceLambdaFunctionExecutionRoleARN:

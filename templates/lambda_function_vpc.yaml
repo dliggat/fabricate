@@ -1,0 +1,201 @@
+AWSTemplateFormatVersion: "2010-09-09"
+
+Description: {{ metadata['description'] }}
+
+Metadata:
+  CommitHash: {{ metadata['commit_hash'] }}
+  CommitMessage: {{ metadata['commit_message'] }}
+
+Parameters:
+  ResourcePrefix:
+    Type: String
+    Description: A description to identify resources  (e.g. "my-perf-test")
+    MinLength: 2
+
+  ScheduleExpression:
+    Type: String
+    Default: ""
+    Description: How often to invoke the function (e.g. 'rate(24 hours)'), or empty string to skip creating a AWS::Events::Rule
+
+  Timeout:
+    Type: Number
+    Description: Timeout for the function in seconds
+
+  MemorySize:
+    Type: Number
+    Description: Memory for the function in MB
+
+  VpcExportIdentifier:
+    Type: String
+
+  SubnetAZ0ExportIdentifier:
+    Type: String
+
+  SubnetAZ1ExportIdentifier:
+    Type: String
+
+Conditions:
+  HasSchedule:
+    "Fn::Not":
+      - "Fn::Equals":
+          - { Ref: ScheduleExpression }
+          - ""
+
+Resources:
+  VpcLambdaFunction:
+    Type: AWS::Lambda::Function
+    Metadata:
+      Comment:
+        "Fn::Sub":
+          "Function for ${ResourcePrefix}"
+    DependsOn: [ VpcLambdaFunctionExecutionRole ]
+    Properties:
+      Code:
+        ZipFile:
+          "Fn::Sub": |
+            import json
+            import logging
+
+            logging.basicConfig()
+            logger = logging.getLogger(__name__)
+            logger.setLevel(logging.INFO)
+
+            def handler(event, context):
+                logger.info('Event: ' + json.dumps(event))
+                logger.info('Context: ' + str(dir(context)))
+                return {'message': 'This is placeholder code! Replace me!'}
+
+      Role: { "Fn::GetAtt": [ VpcLambdaFunctionExecutionRole, Arn ] }
+      Timeout: { Ref: Timeout }
+      Handler: index.handler
+      Runtime: python2.7
+      MemorySize: { Ref: MemorySize }
+      VpcConfig:
+        SecurityGroupIds:
+          - { Ref: LambdaSecurityGroup }
+        SubnetIds:
+          - "Fn::ImportValue": { Ref: SubnetAZ0ExportIdentifier }
+          - "Fn::ImportValue": { Ref: SubnetAZ1ExportIdentifier }
+
+  LambdaSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      VpcId:
+        "Fn::ImportValue": { Ref: VpcExportIdentifier }
+      GroupDescription:
+        "Fn::Join":
+          - "-"
+          - - { Ref: ResourcePrefix }
+            - "sg"
+      Tags:
+        - Key: Name
+          Value:
+            "Fn::Join":
+              - "-"
+              - - { Ref: ResourcePrefix }
+                - "sg"
+  Policy:
+    Type: AWS::IAM::Policy
+    Properties:
+      Roles:
+        - { Ref: VpcLambdaFunctionExecutionRole }
+      PolicyName: CommonPolicyForLambdaAndDevelopment
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Action:
+              - "logs:CreateLogGroup"
+              - "logs:CreateLogStream"
+              - "logs:PutLogEvents"
+            Resource: "arn:aws:logs:*:*:*"
+          - Effect: Allow
+            Action:
+              - "ec2:DescribeSecurityGroups"
+              - "ec2:DescribeNetworkInterfaces"
+              - "ec2:CreateNetworkInterface"
+              - "ec2:DeleteNetworkInterface"
+            Resource: "*"
+
+
+  # The IAM role that the lambda function will execute under.
+  VpcLambdaFunctionExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: [ lambda.amazonaws.com ]
+            Action:
+              - sts:AssumeRole
+          - Effect: Allow
+            Principal:
+              AWS:
+                - "Fn::Join":
+                  - ""
+                  - - "arn:aws:iam::"
+                    - { Ref: "AWS::AccountId" }
+                    - ":"
+                    - "root"
+            Action:
+              - sts:AssumeRole
+      Path: /
+      # # Optional:
+      # ManagedPolicyArns:
+      #   - arn:aws:iam::aws:policy/AmazonEC2ReadOnlyAccess
+
+
+  VpcLambdaCleaner:
+    Type: Custom::VpcLambdaCleaner
+    Properties:
+      ServiceToken: { "Fn::ImportValue": CustomResourceArn-VpcLambdaCleaner }
+      Region: { Ref: "AWS::Region" }
+      GroupId:
+        "Fn::GetAtt": [LambdaSecurityGroup, GroupId]
+
+
+  # Permits the events service to invoke the service.
+  LambdaPermission:
+    Type: AWS::Lambda::Permission
+    Condition: HasSchedule
+    Properties:
+      Action: lambda:InvokeFunction
+      SourceArn:
+        "Fn::GetAtt": [ ScheduledRule, Arn ]
+      FunctionName: { "Fn::GetAtt": [ VpcLambdaFunction, Arn ] }
+      Principal: events.amazonaws.com
+
+
+  # The cron rule for the execution.
+  ScheduledRule:
+    Type: AWS::Events::Rule
+    Condition: HasSchedule
+    Properties:
+      Description:
+        "Fn::Sub":
+          "Scheduled rule for ${ResourcePrefix}"
+      ScheduleExpression: { Ref : ScheduleExpression }
+      State: ENABLED
+      Targets:
+        - Arn: { "Fn::GetAtt": [ VpcLambdaFunction, Arn ] }
+          Id: ScheduledRule
+
+Outputs:
+  VpcLambdaFunction:
+    Value: { Ref : VpcLambdaFunction }
+  VpcLambdaFunctionARN:
+    Value: { "Fn::GetAtt": [ VpcLambdaFunction, Arn ] }
+  VpcLambdaFunctionExecutionRole:
+    Value: { Ref : VpcLambdaFunctionExecutionRole }
+  VpcLambdaFunctionExecutionRoleARN:
+    Value: { "Fn::GetAtt": [ VpcLambdaFunctionExecutionRole, Arn ] }
+  SigninUrl:
+    Value:
+      "Fn::Sub": |
+        https://signin.aws.amazon.com/switchrole?account=${AWS::AccountId}&roleName=${VpcLambdaFunctionExecutionRole}&displayName=assumed-role
+  TestCommand:
+    Value:
+      "Fn::Sub": |
+        aws lambda invoke --function-name ${VpcLambdaFunction} /tmp/${VpcLambdaFunction}-output.txt; cat /tmp/${VpcLambdaFunction}-output.txt
