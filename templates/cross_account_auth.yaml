@@ -56,6 +56,10 @@ Parameters:
     Default: root
     Description: e.g. 'root' (everyone in the trusted account), or a specific IAM user in the trusted AWS account, e.g. 'user/joe'
 
+  EnforceMFA:
+    Type: String
+    Default: "false"
+
   {% for i in range(user_count) %}
   TrustedIamUser{{ i }}:
     Type: String
@@ -92,9 +96,9 @@ Resources:
         Statement:
           - Effect: Allow
             Action: "sts:AssumeRole"
-            Condition:
-              Bool:
-                "aws:MultiFactorAuthPresent": true
+            # Condition:
+            #   Bool:
+            #     "aws:MultiFactorAuthPresent": { Ref: EnforceMFA }
             Principal:
               AWS:
                 - "Fn::Join":

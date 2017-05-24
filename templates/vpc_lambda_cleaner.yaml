@@ -29,6 +29,7 @@ Resources:
             import logging
             import traceback
             from botocore.vendored import requests
+            from time import sleep
 
             logging.basicConfig()
             logger = logging.getLogger(__name__)
@@ -80,6 +81,25 @@ Resources:
                 return {'CreatedByCustomResource': 'false'}
 
             def delete_resource(event, context):
+                client = boto3.client('ec2')
+                enis = client.describe_network_interfaces(Filters=[{'Name': 'group-id','Values': [event['ResourceProperties']['GroupId']]}])
+                for eni in enis['NetworkInterfaces']:
+
+                    # We only care about ENI's created by Lambda
+                    if eni['Description'].startswith('AWS Lambda VPC ENI: '):
+
+                        # Check if the eni is still attached and attempt to detach
+                        if 'Attachment' in eni.keys():
+                            logger.info('Detaching ENI...')
+                            client.detach_network_interface(AttachmentId=eni['Attachment']['AttachmentId'])
+                            logger.info(client.describe_network_interfaces(NetworkInterfaceIds=[eni['NetworkInterfaceId']])['NetworkInterfaces'][0].keys())
+                            while 'Attachment' in client.describe_network_interfaces(NetworkInterfaceIds=[eni['NetworkInterfaceId']])['NetworkInterfaces'][0].keys():
+                                logger.info('eni still attached, waiting 10 seconds...')
+                                sleep(10)
+
+                        # Delete the eni
+                        logger.info('Deleting ENI %s' % eni['NetworkInterfaceId'])
+                        client.delete_network_interface(NetworkInterfaceId=eni['NetworkInterfaceId'])
                 return {'CreatedByCustomResource': 'false'}
 
             def create_resource(event, context):
@@ -108,7 +128,7 @@ Resources:
 
 
       Role: { "Fn::GetAtt": [ CustomResourceLambdaFunctionExecutionRole, Arn ] }
-      Timeout: "30"  # Seconds.
+      Timeout: "300"  # Seconds.
       Handler: index.handler
       Runtime: python2.7
       MemorySize: "128"  # MB.
@@ -134,6 +154,7 @@ Resources:
               - "ec2:DescribeNetworkInterfaces"
               - "ec2:CreateNetworkInterface"
               - "ec2:DeleteNetworkInterface"
+              - "ec2:DetachNetworkInterface"
             Resource: "*"
 
 

@@ -1,0 +1,6 @@
+template: cross_account_auth
+
+parameters:
+  EnforceMFA: "false"
+  TrustedAwsAccountId: "658896902634"
+  ManagedPolicy: "arn:aws:iam::aws:policy/AdministratorAccess"

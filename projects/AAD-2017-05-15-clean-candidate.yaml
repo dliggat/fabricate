@@ -1,0 +1,10 @@
+template: lambda_function_vpc
+
+parameters:
+  ResourcePrefix: clean-candidate
+  ScheduleExpression: ""
+  Timeout: "120"
+  MemorySize: "256"
+  VpcExportIdentifier: dliggat-vpc-VpcId
+  SubnetAZ0ExportIdentifier: dliggat-vpc-PublicSubnetAZ0
+  SubnetAZ1ExportIdentifier: dliggat-vpc-PublicSubnetAZ1
