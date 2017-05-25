@@ -53,10 +53,7 @@ Resources:
                 else:
                     identifier = 'customresourcedb' + event['StackId'].split('/')[-1]
 
-                # sg = client.describe_db_security_groups(
-                #   DBSecurityGroupName=event['ResourceProperties']['DBSecurityGroups'][0])
-                # logger.info('SG' + json.dumps(sg))
-                # sg_id = sg['DBSecurityGroups'][0]['EC2SecurityGroups'][0]['EC2SecurityGroupId']
+                # Note - security groups still to be handled.
 
                 result = client.create_db_instance(
                     DBInstanceIdentifier=identifier,
@@ -66,7 +63,6 @@ Resources:
                     Engine=event['ResourceProperties']['Engine'],
                     MasterUsername=event['ResourceProperties']['MasterUsername'],
                     MasterUserPassword=event['ResourceProperties']['MasterUserPassword'],
-                    # DBSecurityGroups=[sg_id],
                     AvailabilityZone=event['ResourceProperties']['AvailabilityZone'],
                     DBSubnetGroupName=event['ResourceProperties']['DBSubnetGroupName'],
                     Port=int(event['ResourceProperties']['Port']),

@@ -92,27 +92,7 @@ Resources:
       Port: { Ref: DbPort }
       PubliclyAccessible: { Ref: PubliclyAccessible }
       StorageType: standard
-      # DBSecurityGroups:
-      #   - { "Ref": "DatabaseSecurityGroup" }
 
-  # DatabaseSecurityGroup:
-  #   Type: AWS::RDS::DBSecurityGroup
-  #   Properties:
-  #     EC2VpcId:
-  #       "Fn::ImportValue": { Ref: VpcExportIdentifier }
-  #     DBSecurityGroupIngress:
-  #       - "Fn::If":
-  #         - NoDbIngressSecurityGroup
-  #         - { Ref: "AWS::NoValue" }
-  #         - EC2SecurityGroupId: { "Fn::ImportValue" : { Ref: DBIngressSecurityGroupExportIdentifier } }
-  #     GroupDescription: Security group for RDS
-  #     Tags:
-  #       - Key: Name
-  #         Value:
-  #           "Fn::Join":
-  #             - "-"
-  #             - - { Ref: ResourcePrefix }
-  #               - "sg"
 
   DatabaseSubnetGroup:
     Type: AWS::RDS::DBSubnetGroup
