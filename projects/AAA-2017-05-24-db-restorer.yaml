@@ -1,0 +1,4 @@
+template: db_restore_custom_resource
+
+parameters:
+  ResourcePrefix: db_restore_custom_resource

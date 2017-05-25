@@ -1,0 +1,139 @@
+AWSTemplateFormatVersion: "2010-09-09"
+
+Description: {{ metadata['description'] }}
+
+Metadata:
+  CommitHash: {{ metadata['commit_hash'] }}
+  CommitMessage: {{ metadata['commit_message'] }}
+
+Parameters:
+
+  ResourcePrefix:
+    Type: String
+
+  VpcExportIdentifier:
+    Type: String
+
+  SubnetAZ0ExportIdentifier:
+    Type: String
+
+  SubnetAZ1ExportIdentifier:
+    Type: String
+
+  MultiAz:
+    Type: String
+
+  PubliclyAccessible:
+    Type: String
+
+  DbName:
+    Type: String
+
+  DbEngine:
+    Type: String
+
+  DbVersion:
+    Type: String
+
+  DbPort:
+    Type: String
+
+  DbInstanceClass:
+    Type: String
+
+  AllocatedStorage:
+    Type: String
+
+  RdsUsername:
+    Type: String
+    NoEcho: "true"
+
+  RdsPassword:
+    Type: String
+    NoEcho: "true"
+
+  DBIngressSecurityGroupExportIdentifier:
+    Type: String
+    Default: ""
+
+Conditions:
+  NoDbIngressSecurityGroup:
+    "Fn::Equals":
+      - { Ref: DBIngressSecurityGroupExportIdentifier }
+      - ""
+
+  IsMultiAz:
+    "Fn::Equals":
+      - { Ref: MultiAz }
+      - "true"
+
+Resources:
+  RestoredDatabase:
+    Type: Custom::RestoredDatabase
+    Properties:
+      ServiceToken: { "Fn::ImportValue": CustomResourceArn-DbRestorer }
+      Region: { Ref: "AWS::Region" }
+      AllocatedStorage: { Ref: AllocatedStorage }
+      AllowMajorVersionUpgrade: "false"
+      AutoMinorVersionUpgrade: "true"
+      AvailabilityZone:
+        "Fn::If":
+          - IsMultiAz
+          - { Ref: "AWS::NoValue" }
+          - { "Fn::Select": [ "0", { "Fn::GetAZs": "" } ] }
+      DBInstanceClass: { Ref: DbInstanceClass }
+      DBName: { Ref: DbName }
+      DBSubnetGroupName: { "Ref" : "DatabaseSubnetGroup" }
+      Engine: { Ref: DbEngine }
+      EngineVersion: { Ref: DbVersion }
+      MasterUsername: { Ref: RdsUsername }
+      MasterUserPassword: { Ref: RdsPassword }
+      MultiAZ: { Ref: MultiAz }
+      Port: { Ref: DbPort }
+      PubliclyAccessible: { Ref: PubliclyAccessible }
+      StorageType: standard
+      # DBSecurityGroups:
+      #   - { "Ref": "DatabaseSecurityGroup" }
+
+  # DatabaseSecurityGroup:
+  #   Type: AWS::RDS::DBSecurityGroup
+  #   Properties:
+  #     EC2VpcId:
+  #       "Fn::ImportValue": { Ref: VpcExportIdentifier }
+  #     DBSecurityGroupIngress:
+  #       - "Fn::If":
+  #         - NoDbIngressSecurityGroup
+  #         - { Ref: "AWS::NoValue" }
+  #         - EC2SecurityGroupId: { "Fn::ImportValue" : { Ref: DBIngressSecurityGroupExportIdentifier } }
+  #     GroupDescription: Security group for RDS
+  #     Tags:
+  #       - Key: Name
+  #         Value:
+  #           "Fn::Join":
+  #             - "-"
+  #             - - { Ref: ResourcePrefix }
+  #               - "sg"
+
+  DatabaseSubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupDescription: Subnet group for the RDS instance
+      SubnetIds:
+        - "Fn::ImportValue": { Ref: SubnetAZ0ExportIdentifier }
+        - "Fn::ImportValue": { Ref: SubnetAZ1ExportIdentifier }
+      Tags:
+        - Key: Name
+          Value:
+            "Fn::Join":
+              - "-"
+              - - { Ref: ResourcePrefix }
+                - "subnet-group"
+
+
+
+Outputs:
+  RestoredDatabase:
+    Value: { Ref: RestoredDatabase }
+  RestoredDatabaseCreatedByCustomResource:
+    Value:
+      "Fn::GetAtt": [RestoredDatabase, CreatedByCustomResource]

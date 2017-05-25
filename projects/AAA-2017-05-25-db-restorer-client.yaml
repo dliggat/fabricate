@@ -1,0 +1,17 @@
+template: db_restore_custom_resource_client
+
+parameters:
+  ResourcePrefix: restorer-client
+  VpcExportIdentifier: dliggat-vpc-VpcId
+  SubnetAZ0ExportIdentifier: dliggat-vpc-PrivateSubnetAZ0
+  SubnetAZ1ExportIdentifier: dliggat-vpc-PrivateSubnetAZ1
+  DbName: whatever
+  MultiAz: "false"
+  PubliclyAccessible: "false"
+  DbEngine: mysql
+  DbVersion: "5.6"
+  DbPort: "3306"
+  DbInstanceClass: db.t2.medium
+  AllocatedStorage: "10"
+  RdsUsername: foobarbaz
+  RdsPassword: foobarbaz
