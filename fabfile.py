@@ -178,7 +178,7 @@ def cli_create():
 @task
 def cli_update():
     project = Project()
-    logger.info('aws cloudformation updateh-stack --capabilities CAPABILITY_IAM --stack-name {0} '
+    logger.info('aws cloudformation update-stack --capabilities CAPABILITY_IAM --stack-name {0} '
                 '--template-body file://{1} '
                 '--parameters file://{2}'.format(
                     project.name,
