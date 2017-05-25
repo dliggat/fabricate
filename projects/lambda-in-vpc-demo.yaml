@@ -1,7 +1,7 @@
 template: lambda_function_vpc
 
 parameters:
-  ResourcePrefix: clean-candidate
+  ResourcePrefix: lambda-in-vpc
   ScheduleExpression: ""
   Timeout: "120"
   MemorySize: "256"

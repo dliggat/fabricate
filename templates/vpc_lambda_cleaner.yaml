@@ -28,57 +28,18 @@ Resources:
             import json
             import logging
             import traceback
-            from botocore.vendored import requests
+            import cfnresponse
             from time import sleep
 
             logging.basicConfig()
             logger = logging.getLogger(__name__)
             logger.setLevel(logging.INFO)
 
-            def send_cfn_response(event,
-                                  context,
-                                  response_status,
-                                  response_data={},
-                                  physical_resource_id=None):
-
-                if physical_resource_id is None:
-                    physical_resource_id = context.log_stream_name
-                response_data = { str(k): str(v) for k,v in response_data.items() }
-                reason = ('See the details in CloudWatch Log Stream: %s from Log Group: %s' % (
-                    context.log_stream_name, context.log_group_name))
-                if (response_status == 'FAILED') and 'result' in response_data:
-                    reason = '%s %s' % (response_data['result'], reason)
-
-                body = {
-                    'Status': response_status,
-                    'Reason': reason,
-                    'PhysicalResourceId': physical_resource_id,
-                    'StackId': event['StackId'],
-                    'RequestId': event['RequestId'],
-                    'LogicalResourceId': event['LogicalResourceId'],
-                    'Data': response_data
-                }
-                response_body = json.dumps(body)
-                logger.debug('Response body: %s', response_body)
-                try:
-                    response = requests.put(event['ResponseURL'],
-                                            data=response_body)
-                    logger.debug('Status code: %s' % response.status_code)
-                except Exception as e:
-                    logger.error('send(..) failed executing https.request(..): %s' %
-                                 e.message)
-
-            class Status(object):
-                SUCCESS = 'SUCCESS'
-                FAILED = 'FAILED'
-
-            class Type(object):
-                CREATE = 'Create'
-                DELETE = 'Delete'
-                UPDATE = 'Update'
+            def create_resource(event, context):
+                return {'CreatedByCustomResource': 'false'}, 'no-op'
 
             def update_resource(event, context):
-                return {'CreatedByCustomResource': 'false'}
+                return {'CreatedByCustomResource': 'unknown'}
 
             def delete_resource(event, context):
                 client = boto3.client('ec2')
@@ -102,9 +63,6 @@ Resources:
                         client.delete_network_interface(NetworkInterfaceId=eni['NetworkInterfaceId'])
                 return {'CreatedByCustomResource': 'false'}
 
-            def create_resource(event, context):
-                return {'CreatedByCustomResource': 'false'}, 'no-op'
-
             def handler(event, context):
                 logger.info('Event: ' + json.dumps(event))
                 logger.info('Context: ' + str(dir(context)))
@@ -112,19 +70,19 @@ Resources:
                 physical_id = None
                 data = { }
                 try:
-                    if operation == Type.CREATE:
+                    if operation == 'Create':
                         data, physical_id = create_resource(event, context)
-                    elif operation == Type.DELETE:
+                    elif operation == 'Delete':
                         data = delete_resource(event, context)
                     else:
                         data = update_resource(event, context)
                 except Exception as e:
                     logger.error('CloudFormation custom resource {0} failed. Exception: {1}'.format(operation, traceback.format_exc()))
-                    status = Status.FAILED
+                    status = cfnresponse.FAILED
                 else:
-                    status = Status.SUCCESS
+                    status = cfnresponse.SUCCESS
                     logger.info('CloudFormation custom resource {0} succeeded. Result data {1}'.format(operation, json.dumps(data)))
-                send_cfn_response(event, context, status, data, physical_id)
+                cfnresponse.send(event, context, status, data, physical_id)
 
 
       Role: { "Fn::GetAtt": [ CustomResourceLambdaFunctionExecutionRole, Arn ] }

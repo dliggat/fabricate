@@ -164,6 +164,27 @@ def validate():
                 project.rendered_template_filename, e))
             abort('Template validation error')
 
+@task
+def cli_create():
+    project = Project()
+    logger.info('aws cloudformation create-stack --capabilities CAPABILITY_IAM --stack-name {0} '
+                '--template-body file://{1} '
+                '--parameters file://{2}'.format(
+                    project.name,
+                    project.rendered_template_filename,
+                    project.rendered_parameters_filename))
+
+
+@task
+def cli_update():
+    project = Project()
+    logger.info('aws cloudformation updateh-stack --capabilities CAPABILITY_IAM --stack-name {0} '
+                '--template-body file://{1} '
+                '--parameters file://{2}'.format(
+                    project.name,
+                    project.rendered_template_filename,
+                    project.rendered_parameters_filename))
+
 
 @task
 def clean():
