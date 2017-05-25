@@ -20,7 +20,7 @@ Resources:
     Properties:
       ServiceToken: { "Fn::ImportValue": CustomResourceArn-IdempotentBucketCreator }
       Region: { Ref: "AWS::Region" }
-      Name: amazon
+      Name: unique-name-goes-here
 
 
 
