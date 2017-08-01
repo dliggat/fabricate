@@ -12,4 +12,4 @@ parameters:
   InstanceType: t2.medium
   LogsBucket: dliggat-load-balancer-logs
   LogsPrefix: elb-demo
-  LoggingEnabled: "true"
+  LoggingEnabled: "false"
