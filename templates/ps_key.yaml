@@ -1,0 +1,50 @@
+AWSTemplateFormatVersion: "2010-09-09"
+
+Description: {{ metadata['description'] }}
+
+Metadata:
+  CommitHash: {{ metadata['commit_hash'] }}
+  CommitMessage: {{ metadata['commit_message'] }}
+
+Parameters:
+  KeyNamespace:
+    Type: "String"
+
+Resources:
+  KmsKeyAlias:
+    Type: "AWS::KMS::Alias"
+    Properties:
+      AliasName:
+        "Fn::Sub": "alias/${KeyNamespace}"
+      TargetKeyId:
+        { "Ref": KmsKey }
+  KmsKey:
+    Type: "AWS::KMS::Key"
+    Properties:
+      Description:
+        "Fn::Sub": "Manages secrets in the ${KeyNamespace} namespace"
+      Enabled: true
+      EnableKeyRotation: false
+      KeyPolicy:
+        Version: "2012-10-17"
+        Id: "KeyPolicyForKMS"
+        Statement:
+          - Sid: "Enable IAM User Permissions"
+            Effect: "Allow"
+            Principal:
+              AWS:
+                "Fn::Sub": "arn:aws:iam::${AWS::AccountId}:root"
+            Action: "kms:*"
+            Resource: "*"
+
+Outputs:
+  KmsKeyId:
+    Description: "ID of the KMS key"
+    Value: { "Ref": KmsKey }
+    Export:
+      Name: { "Fn::Sub": "kms:key:${KeyNamespace}:id" }
+  KmsKeyArn:
+    Description: "ARN of the KMS key"
+    Value: { "Fn::GetAtt": KmsKey.Arn }
+    Export:
+      Name: { "Fn::Sub": "kms:key:${KeyNamespace}:arn" }

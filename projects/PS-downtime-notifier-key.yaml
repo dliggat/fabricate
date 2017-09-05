@@ -1,0 +1,5 @@
+template: ps_key
+
+parameters:
+  KeyNamespace: downtime-notifier
+

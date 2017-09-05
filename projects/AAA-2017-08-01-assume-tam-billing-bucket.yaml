@@ -1,0 +1,5 @@
+template: billing_bucket_readonly
+
+parameters:
+  TrustedAwsAccountId: "579412327719"
+  BillingBucketName: unbounce-aws-billing-cur

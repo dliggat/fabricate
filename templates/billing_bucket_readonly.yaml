@@ -1,0 +1,71 @@
+AWSTemplateFormatVersion: "2010-09-09"
+
+# Description: {{ metadata["description"] }}
+Description: A role that grants readonly access to a bucket and trusts another account to assume
+
+Parameters:
+  TrustedAwsAccountId:
+    Type: String
+    Description: The account ID to trust
+    Default: "579412327719"
+
+  BillingBucketName:
+    Type: String
+    Description: The bucket where billing reports go
+    Default: unbounce-aws-billing-cur
+
+Resources:
+
+  CrossAccountRole:
+    Type: AWS::IAM::Role
+    Properties:
+      Policies:
+        - PolicyName: permit-readonly-access-to-bucket
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Action:
+                  - "s3:ListBucket"
+                  - "s3:GetBucketLocation"
+                Effect: Allow
+                Resource:
+                  "Fn::Join":
+                    - ""
+                    - - "arn:aws:s3:::"
+                      - { Ref: BillingBucketName }
+              - Action:
+                - "s3:GetObject"
+                - "s3:GetObjectAcl"
+                Effect: Allow
+                Resource:
+                  "Fn::Join":
+                    - ""
+                    - - "arn:aws:s3:::"
+                      - { Ref: BillingBucketName }
+                      - "/*"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Action: "sts:AssumeRole"
+            Principal:
+              AWS: { Ref: TrustedAwsAccountId }
+
+
+Outputs:
+  CrossAccountRoleName:
+    Value: { Ref: CrossAccountRole }
+  CrossAccountRoleArn:
+    Value:
+      "Fn::GetAtt":
+        - CrossAccountRole
+        - Arn
+
+  SigninUrl:
+    Value:
+      "Fn::Join":
+        - ""
+        - - "https://signin.aws.amazon.com/switchrole?account="
+          - { Ref: "AWS::AccountId" }
+          - "&roleName="
+          - { Ref: CrossAccountRole }

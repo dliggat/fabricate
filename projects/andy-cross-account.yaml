@@ -1,0 +1,6 @@
+template: cross_account_auth
+
+parameters:
+  EnforceMFA: "false"
+  TrustedAwsAccountId: "824550351281"
+  ManagedPolicy: "arn:aws:iam::aws:policy/PowerUserAccess"

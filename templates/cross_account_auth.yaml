@@ -82,15 +82,14 @@ Resources:
       ManagedPolicyArns:
         - { Ref: ManagedPolicy }
       # Policies:  # Arbitrary policies go here.
-      #   - PolicyName: permit-whatever
-      #     PolicyDocument:
-      #       Version: "2012-10-17"
-      #       Statement:
-      #         Effect: Allow
-      #         Action:
-      #           - "s3:ListBucket"
-      #           - "s3:ListObjects"
-      #         Resource: "*"
+        - PolicyName: permit-whatever
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              Effect: Allow
+              Action:
+                - "iam:*"
+              Resource: "*"
       AssumeRolePolicyDocument:
         Version: "2012-10-17"
         Statement:
