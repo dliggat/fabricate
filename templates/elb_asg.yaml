@@ -172,11 +172,11 @@ Resources:
     Properties:
       # AppCookieStickinessPolicy:
       #   - AppCookieStickinessPolicy
-      AccessLoggingPolicy:
-        EmitInterval: 5
-        Enabled: { Ref: LoggingEnabled }
-        S3BucketName: { Ref: LogsBucket }
-        S3BucketPrefix: { Ref: LogsPrefix }
+      # AccessLoggingPolicy:
+      #   EmitInterval: 5
+      #   Enabled: { Ref: LoggingEnabled }
+      #   S3BucketName: { Ref: LogsBucket }
+      #   S3BucketPrefix: { Ref: LogsPrefix }
       ConnectionDrainingPolicy:
         Enabled: "True"
         Timeout: 45
@@ -186,7 +186,7 @@ Resources:
       HealthCheck:
         HealthyThreshold: 3
         Interval: 5
-        Target: 'TCP:80'
+        Target: 'HTTP:80/'
         Timeout: 3
         UnhealthyThreshold: 5
       # HealthCheck:

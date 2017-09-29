@@ -1,0 +1,8 @@
+template: lambda-to-kinesis
+
+parameters:
+  ResourcePrefix: davesbs
+  StreamName: "davesbsstream"
+  Timeout: "150"
+  MemorySize: "256"
+  BatchSize: "4"

@@ -1,0 +1,6 @@
+template: basic_step_function
+
+parameters:
+  ResourcePrefix: step
+  Timeout: "300"
+  MemorySize: "256"

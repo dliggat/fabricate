@@ -1,0 +1,4 @@
+template: api_gateway_lambda
+
+parameters:
+  ResourcePrefix: sbs-lambda-gateway

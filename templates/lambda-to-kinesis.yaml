@@ -1,0 +1,181 @@
+AWSTemplateFormatVersion: "2010-09-09"
+
+Description: {{ metadata['description'] }}
+
+Metadata:
+  CommitHash: {{ metadata['commit_hash'] }}
+  CommitMessage: {{ metadata['commit_message'] }}
+
+Parameters:
+  ResourcePrefix:
+    Type: String
+    Description: A description to identify resources  (e.g. "my-perf-test")
+    MinLength: 2
+
+  StreamName:
+    Type: String
+    MinLength: 2
+
+  Timeout:
+    Type: Number
+    Description: Timeout for the function in seconds
+
+  BatchSize:
+    Type: Number
+    Description: Kinesis batch size
+
+  MemorySize:
+    Type: Number
+    Description: Memory for the function in MB
+
+
+Resources:
+  LambdaFunction:
+    Type: AWS::Lambda::Function
+    Metadata:
+      Comment:
+        "Fn::Sub":
+          "Function for ${ResourcePrefix}"
+    DependsOn: [ LambdaFunctionExecutionRole ]
+    Properties:
+      Code:
+        ZipFile:
+          "Fn::Sub": |
+            import json
+            import logging
+
+            logging.basicConfig()
+            logger = logging.getLogger(__name__)
+            logger.setLevel(logging.INFO)
+
+            def handler(event, context):
+                logger.info('Event: ' + json.dumps(event))
+                logger.info('Context: ' + str(dir(context)))
+                return {'message': 'This is placeholder code! Replace me!'}
+
+      Role: { "Fn::GetAtt": [ LambdaFunctionExecutionRole, Arn ] }
+      Timeout: { Ref: Timeout }
+      Handler: index.handler
+      Runtime: python2.7
+      MemorySize: { Ref: MemorySize }
+
+  Policy:
+    Type: AWS::IAM::Policy
+    Properties:
+      Roles:
+        - { Ref: LambdaFunctionExecutionRole }
+      PolicyName: CommonPolicyForLambdaAndDevelopment
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Action:
+              - "logs:CreateLogGroup"
+              - "logs:CreateLogStream"
+              - "logs:PutLogEvents"
+            Resource: "arn:aws:logs:*:*:*"
+          - Effect: Allow
+            Action:
+              - "ec2:DescribeSecurityGroups"
+            Resource: "*"
+          - Effect: Allow
+            Action:
+              - "kinesis:GetShardIterator"
+              - "kinesis:GetRecords"
+              - "kinesis:DescribeStream"
+              - "kinesis:ListStreams"
+            Resource:
+              "Fn::GetAtt": [Stream, Arn]
+          - Effect: Allow
+            Action:
+              - "kinesis:ListStreams"
+            Resource: "*"
+
+
+  # The IAM role that the lambda function will execute under.
+  LambdaFunctionExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: [ lambda.amazonaws.com ]
+            Action:
+              - sts:AssumeRole
+          - Effect: Allow
+            Principal:
+              AWS:
+                - "Fn::Join":
+                  - ""
+                  - - "arn:aws:iam::"
+                    - { Ref: "AWS::AccountId" }
+                    - ":"
+                    - "root"
+            Action:
+              - sts:AssumeRole
+      Path: /
+      # # Optional:
+      # ManagedPolicyArns:
+      #   - arn:aws:iam::aws:policy/AmazonEC2ReadOnlyAccess
+
+  IoTExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: [ iot.amazonaws.com ]
+            Action:
+              - sts:AssumeRole
+      Path: /
+      Policies:
+        - PolicyName: kinesis-put
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - "kinesis:PutRecord"
+                Resource:
+                  "Fn::GetAtt": [Stream, Arn]
+
+  Stream:
+    Type: AWS::Kinesis::Stream
+    Properties:
+      Name: { Ref: StreamName }
+      ShardCount: 1
+
+  StreamEventSource:
+    Type: AWS::Lambda::EventSourceMapping
+    DependsOn: [ Policy ]
+    Properties:
+      FunctionName: { Ref: LambdaFunction }
+      BatchSize: { Ref: BatchSize }
+      Enabled: true
+      EventSourceArn:
+        "Fn::GetAtt": [Stream, Arn]
+      StartingPosition: TRIM_HORIZON
+
+
+
+Outputs:
+  LambdaFunction:
+    Value: { Ref : LambdaFunction }
+  LambdaFunctionARN:
+    Value: { "Fn::GetAtt": [ LambdaFunction, Arn ] }
+  LambdaFunctionExecutionRole:
+    Value: { Ref : LambdaFunctionExecutionRole }
+  LambdaFunctionExecutionRoleARN:
+    Value: { "Fn::GetAtt": [ LambdaFunctionExecutionRole, Arn ] }
+  SigninUrl:
+    Value:
+      "Fn::Sub": |
+        https://signin.aws.amazon.com/switchrole?account=${AWS::AccountId}&roleName=${LambdaFunctionExecutionRole}&displayName=assumed-role
+  TestCommand:
+    Value:
+      "Fn::Sub": |
+        aws lambda invoke --function-name ${LambdaFunction} /tmp/${LambdaFunction}-output.txt; cat /tmp/${LambdaFunction}-output.txt
