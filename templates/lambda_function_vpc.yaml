@@ -53,22 +53,33 @@ Resources:
       Code:
         ZipFile:
           "Fn::Sub": |
-            import json
-            import logging
 
-            logging.basicConfig()
-            logger = logging.getLogger(__name__)
-            logger.setLevel(logging.INFO)
+            const https = require('https');
 
-            def handler(event, context):
-                logger.info('Event: ' + json.dumps(event))
-                logger.info('Context: ' + str(dir(context)))
-                return {'message': 'This is placeholder code! Replace me!'}
+            exports.handler = (event, context, callback) => {
+              https.get('https://www.google.ca', (resp) => {
+                let data = '';
+
+                // A chunk of data has been recieved.
+                resp.on('data', (chunk) => {
+                  data += chunk;
+                });
+
+                // The whole response has been received. Print out the result.
+                resp.on('end', () => {
+                  console.log(data);
+                });
+
+              }).on('error', (err) => {
+                console.log("Error: " + err.message);
+              });
+            };
+
 
       Role: { "Fn::GetAtt": [ VpcLambdaFunctionExecutionRole, Arn ] }
       Timeout: { Ref: Timeout }
       Handler: index.handler
-      Runtime: python2.7
+      Runtime: nodejs6.10
       MemorySize: { Ref: MemorySize }
       VpcConfig:
         SecurityGroupIds:
@@ -94,28 +105,6 @@ Resources:
               - "-"
               - - { Ref: ResourcePrefix }
                 - "sg"
-  Policy:
-    Type: AWS::IAM::Policy
-    Properties:
-      Roles:
-        - { Ref: VpcLambdaFunctionExecutionRole }
-      PolicyName: CommonPolicyForLambdaAndDevelopment
-      PolicyDocument:
-        Version: "2012-10-17"
-        Statement:
-          - Effect: Allow
-            Action:
-              - "logs:CreateLogGroup"
-              - "logs:CreateLogStream"
-              - "logs:PutLogEvents"
-            Resource: "arn:aws:logs:*:*:*"
-          - Effect: Allow
-            Action:
-              - "ec2:DescribeSecurityGroups"
-              - "ec2:DescribeNetworkInterfaces"
-              - "ec2:CreateNetworkInterface"
-              - "ec2:DeleteNetworkInterface"
-            Resource: "*"
 
 
   # The IAM role that the lambda function will execute under.
@@ -142,18 +131,36 @@ Resources:
             Action:
               - sts:AssumeRole
       Path: /
+      Policies:
+        - PolicyName: CommonPolicyForLambdaAndDevelopment
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - "logs:CreateLogGroup"
+                  - "logs:CreateLogStream"
+                  - "logs:PutLogEvents"
+                Resource: "arn:aws:logs:*:*:*"
+              - Effect: Allow
+                Action:
+                  - "ec2:DescribeSecurityGroups"
+                  - "ec2:DescribeNetworkInterfaces"
+                  - "ec2:CreateNetworkInterface"
+                  - "ec2:DeleteNetworkInterface"
+                Resource: "*"
       # # Optional:
       # ManagedPolicyArns:
       #   - arn:aws:iam::aws:policy/AmazonEC2ReadOnlyAccess
 
 
-  VpcLambdaCleaner:
-    Type: Custom::VpcLambdaCleaner
-    Properties:
-      ServiceToken: { "Fn::ImportValue": CustomResourceArn-VpcLambdaCleaner }
-      Region: { Ref: "AWS::Region" }
-      GroupId:
-        "Fn::GetAtt": [LambdaSecurityGroup, GroupId]
+  # VpcLambdaCleaner:
+  #   Type: Custom::VpcLambdaCleaner
+  #   Properties:
+  #     ServiceToken: { "Fn::ImportValue": CustomResourceArn-VpcLambdaCleaner }
+  #     Region: { Ref: "AWS::Region" }
+  #     GroupId:
+  #       "Fn::GetAtt": [LambdaSecurityGroup, GroupId]
 
 
   # Permits the events service to invoke the service.

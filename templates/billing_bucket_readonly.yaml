@@ -7,12 +7,10 @@ Parameters:
   TrustedAwsAccountId:
     Type: String
     Description: The account ID to trust
-    Default: "579412327719"
 
   BillingBucketName:
     Type: String
     Description: The bucket where billing reports go
-    Default: unbounce-aws-billing-cur
 
 Resources:
 

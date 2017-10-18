@@ -1,0 +1,5 @@
+template: billing_bucket_readonly
+
+parameters:
+  TrustedAwsAccountId: "824550351281"
+  BillingBucketName: urthecast-billing-reports
