@@ -1,0 +1,6 @@
+template: kinesis_esm
+
+parameters:
+  BatchSize: "1"
+  # FunctionName: kinesis-blue-development-stack-LambdaFunction-10S6F45JMLMCK
+  FunctionName: kinesis-green-development-stack-LambdaFunction-1QFHA69QJ1BBH

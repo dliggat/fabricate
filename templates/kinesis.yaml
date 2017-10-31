@@ -1,0 +1,42 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: {{ metadata["description"] }}
+
+Metadata:
+  CommitHash: {{ metadata["commit_hash"] }}
+  CommitMessage: {{ metadata["commit_message"] }}
+
+Parameters:
+  ShardCount:
+    Type: Number
+    Description: Kinesis shard count
+  StreamName:
+    Type: String
+    MinLength: 2
+
+Resources:
+  Stream:
+    Type: AWS::Kinesis::Stream
+    Properties:
+      Name: { Ref: StreamName }
+      ShardCount: { Ref: ShardCount }
+
+Outputs:
+  KinesisArn:
+    Value: { "Fn::GetAtt": [ Stream, Arn ] }
+    Export:
+      Name:
+        "Fn::Join":
+          - "-"
+          - - { Ref: StreamName }
+            - ARN
+
+  # StreamEventSource:
+  #   Type: AWS::Lambda::EventSourceMapping
+  #   DependsOn: [ Policy ]
+  #   Properties:
+  #     FunctionName: { Ref: LambdaFunction }
+  #     BatchSize: { Ref: BatchSize }
+  #     Enabled: true
+  #     EventSourceArn:
+  #       "Fn::GetAtt": [Stream, Arn]
+  #     StartingPosition: TRIM_HORIZON

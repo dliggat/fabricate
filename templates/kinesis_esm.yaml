@@ -1,0 +1,25 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: {{ metadata["description"] }}
+
+Metadata:
+  CommitHash: {{ metadata["commit_hash"] }}
+  CommitMessage: {{ metadata["commit_message"] }}
+
+Parameters:
+  BatchSize:
+    Type: Number
+  FunctionName:
+    Type: String
+    MinLength: 2
+
+Resources:
+  StreamEventSource:
+    Type: AWS::Lambda::EventSourceMapping
+    Properties:
+      FunctionName: { Ref: FunctionName }
+      BatchSize: { Ref: BatchSize }
+      Enabled: true
+      EventSourceArn:
+        "Fn::ImportValue":
+          "BlueGreenStream-ARN"
+      StartingPosition: TRIM_HORIZON

@@ -1,0 +1,5 @@
+template: kinesis
+
+parameters:
+  ShardCount: "1"
+  StreamName: BlueGreenStream
